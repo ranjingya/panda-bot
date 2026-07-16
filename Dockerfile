@@ -6,7 +6,8 @@ RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ uv
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock ./
+COPY docs/README.md ./docs/README.md
 
 # 先安装运行依赖，充分利用 Docker 缓存
 RUN uv sync --frozen --no-dev --no-install-project -i https://mirrors.aliyun.com/pypi/simple/

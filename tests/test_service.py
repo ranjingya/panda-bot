@@ -152,7 +152,7 @@ async def test_live_status_command_replies_without_affecting_rules(
     assert "保护静默：无" in gateway.sent[0][1]
     assert "下午活跃：0 人 / 0 轮" in gateway.sent[0][1]
     assert "今天冒泡：0 次" in gateway.sent[0][1]
-    assert "规则版本：2" in gateway.sent[0][1]
+    assert f"规则版本：{rules.version}" in gateway.sent[0][1]
     assert "每日上限" not in gateway.sent[0][1]
     assert "关键词" not in gateway.sent[0][1]
     state = await repository.load_state("chat")

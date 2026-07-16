@@ -20,7 +20,7 @@
 - 工作时段内发送 `@盼达 /status` 可查看动态运行状态，不影响能量、冷却和互动次数。
 - 不评价个人，不做考勤，不保存长期聊天正文。
 
-完整项目约束见 [AGENTS.md](AGENTS.md)，实施范围和验收标准见 [PLAN.md](PLAN.md)。
+完整项目约束见 [AGENTS.md](../AGENTS.md)，实施范围和验收标准见 [PLAN.md](PLAN.md)，规则参数与日志原因见 [规则与决策原因](RULES_AND_REASONS.md)。
 
 ## 技术架构
 
@@ -55,6 +55,10 @@
 ## 目录结构
 
 ```text
+docs/
+├── README.md            # 项目使用说明
+├── PLAN.md              # 实施范围与验收标准
+└── RULES_AND_REASONS.md # 规则参数与日志原因
 config/
 ├── rules.yaml          # 时段、词表、能量、概率和冷却
 └── messages.yaml       # 60 条主动文案和 18 条回嘴文案

@@ -64,7 +64,7 @@
 - 提供审核文案库和默认规则配置。
 - 提供 `.env.example`、`Dockerfile`、`compose.yaml` 和 `.dockerignore`。
 - 使用非 root 用户运行容器，挂载 SQLite 数据目录，配置健康检查和自动重启。
-- 更新 `README.md`，说明飞书配置、影子运行、正式运行、测试和故障排查。
+- 更新 `docs/README.md`，说明飞书配置、影子运行、正式运行、测试和故障排查。
 
 验收标准：本地可通过 `uv run --env-file .env panda-bot` 启动，Docker 配置可解析，镜像具备确定的启动入口。
 

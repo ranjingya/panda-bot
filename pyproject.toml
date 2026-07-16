@@ -2,7 +2,7 @@
 name = "panda-bot"
 version = "0.1.0"
 description = "飞书群聊中的事件驱动型下班氛围机器人"
-readme = "README.md"
+readme = "docs/README.md"
 requires-python = ">=3.12,<3.15"
 dependencies = [
     "lark-channel-sdk==1.2.0",
