@@ -7,17 +7,21 @@ from pathlib import Path
 import yaml
 
 
-def test_compose_starts_bot_and_provides_fixed_shadow_export_command() -> None:
-    """Compose 应直接启动机器人，并提供无需补充参数的 Shadow 导出服务。"""
+def test_compose_exposes_explicit_shadow_and_live_modes() -> None:
+    """Compose 应以服务参数明确选择模式，并提供固定的 Shadow 导出服务。"""
 
     config = yaml.safe_load(Path("compose.yaml").read_text(encoding="utf-8"))
     services = config["services"]
 
-    assert "command" not in services["panda-bot"]
-    assert services["panda-bot"]["volumes"] == ["./data:/app/data"]
+    assert services["shadow"]["command"] == ["shadow"]
+    assert services["shadow"]["profiles"] == ["shadow"]
+    assert services["live"]["command"] == ["live"]
+    assert services["live"]["profiles"] == ["live"]
+    assert services["shadow"]["volumes"] == ["./data:/app/data"]
+    assert services["live"]["volumes"] == ["./data:/app/data"]
     assert services["shadow-export"]["profiles"] == ["tools"]
+    assert services["shadow-export"]["entrypoint"] == ["./.venv/bin/panda-shadow-export"]
     assert services["shadow-export"]["command"] == [
-        "./.venv/bin/panda-shadow-export",
         "--days",
         "5",
         "--output",

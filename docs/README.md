@@ -108,14 +108,13 @@ LARK_APP_ID=cli_xxx
 LARK_APP_SECRET=your_app_secret
 PANDA_TARGET_CHAT_ID=oc_xxx
 PANDA_PRIVACY_SALT=replace_with_a_random_local_value
-PANDA_MODE=shadow
 ```
 
-构建并启动机器人：
+模式由启动参数明确选择，不读取 `.env`。首次构建并启动 Shadow：
 
 ```bash
-docker compose up -d --build panda-bot
-docker compose logs -f panda-bot
+docker compose up -d --build shadow
+docker compose logs -f shadow
 ```
 
 首次运行使用 `shadow` 模式。该模式正常接收、分类、抽签和更新状态，不向群内发送任何消息；同时保存目标群有效成员文字的脱敏正文及当时的分类、决策、能量和活跃度快照。默认保留 5 天，每次采集时自动删除过期记录。
@@ -126,16 +125,14 @@ docker compose logs -f panda-bot
 docker compose run --rm shadow-export
 ```
 
-导出天数、数据库路径和输出路径已经写入 `compose.yaml`，无需在命令中填写。报告会直接生成到宿主机 `data/shadow-review.md`；该目录已被 Git 忽略。可以让 AI 读取该报告，找出真实收尾表达的漏判与误判，并总结群聊节奏、常用梗和文案风格建议。完成校准并更新 `config/rules.yaml`、`config/messages.yaml` 后，将模式切换为：
+导出天数、数据库路径和输出路径已经写入 `compose.yaml`，无需在命令中填写。报告会直接生成到宿主机 `data/shadow-review.md`；该目录已被 Git 忽略。可以让 AI 读取该报告，找出真实收尾表达的漏判与误判，并总结群聊节奏、常用梗和文案风格建议。
 
-```dotenv
-PANDA_MODE=live
-```
-
-重新创建容器使模式和配置生效：
+完成校准并更新 `config/rules.yaml`、`config/messages.yaml` 后，停止 Shadow 并用参数启动 Live：
 
 ```bash
-docker compose up -d --build --force-recreate panda-bot
+docker compose down
+docker compose up -d --build live
+docker compose logs -f live
 ```
 
 正式模式首次启动时会发送一次欢迎语。容器使用非 root 用户运行，SQLite 数据和 Shadow 报告保存在宿主机 `data/` 目录，重新创建容器不会删除群状态。
@@ -152,8 +149,11 @@ docker compose down
 
 ```bash
 uv sync --all-groups
-uv run --env-file .env panda-bot
+uv run --env-file .env panda-bot shadow
+uv run --env-file .env panda-bot live
 ```
+
+`shadow` 或 `live` 是必填启动参数；不传参数时程序会直接报错退出，防止模式不明确。
 
 ## 配置说明
 
@@ -215,7 +215,7 @@ uv run pytest
 
 关键流程使用标准日志输出，不记录消息正文。常见启动问题：
 
-- 缺少环境变量：检查 `.env` 中的应用凭证和目标群 ID，并使用 `uv run --env-file .env panda-bot` 启动。
+- 缺少环境变量：检查 `.env` 中的应用凭证和目标群 ID，并使用 `panda-bot shadow` 或 `panda-bot live` 明确启动模式。
 - 长连接失败：确认应用为企业自建应用、事件订阅方式是长连接且应用能够访问公网。
 - 收不到群消息：确认机器人已加入群、权限已开通并已发布新版本。
-- 无实际发言：确认 `PANDA_MODE=live`，当前时间位于允许区间，并检查日志中的决策原因。
+- 无实际发言：确认启动的是 Compose `live` 服务，当前时间位于允许区间，并检查日志中的决策原因。

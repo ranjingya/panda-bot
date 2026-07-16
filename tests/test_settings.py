@@ -46,10 +46,12 @@ def test_runtime_loads_process_environment(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("LARK_APP_SECRET", "secret")
     monkeypatch.setenv("PANDA_TARGET_CHAT_ID", "oc_test")
     monkeypatch.setenv("PANDA_DATABASE_PATH", "/app/data/panda.db")
+    monkeypatch.setenv("PANDA_MODE", "live")
 
-    runtime = RuntimeSettings.from_env()
+    runtime = RuntimeSettings.from_env(mode="shadow")
 
     assert runtime.app_id == "cli_test"
     assert runtime.app_secret == "secret"
     assert runtime.target_chat_id == "oc_test"
     assert runtime.database_path == Path("/app/data/panda.db")
+    assert runtime.mode == "shadow"

@@ -18,4 +18,4 @@ COPY config ./config
 # 安装当前项目
 RUN uv sync --frozen --no-dev -i https://mirrors.aliyun.com/pypi/simple/
 
-CMD ["./.venv/bin/panda-bot"]
+ENTRYPOINT ["./.venv/bin/panda-bot"]

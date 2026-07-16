@@ -1,19 +1,32 @@
+x-bot-service: &bot-service
+  build:
+    context: .
+  image: panda-bot:local
+  env_file:
+    - .env
+  environment:
+    PANDA_DATABASE_PATH: /app/data/panda.db
+    PANDA_RULES_PATH: /app/config/rules.yaml
+    PANDA_MESSAGES_PATH: /app/config/messages.yaml
+  volumes:
+    - ./data:/app/data
+  restart: unless-stopped
+  stop_grace_period: 20s
+
 services:
-  panda-bot:
-    build:
-      context: .
-    image: panda-bot:local
-    container_name: panda-bot
-    env_file:
-      - .env
-    environment:
-      PANDA_DATABASE_PATH: /app/data/panda.db
-      PANDA_RULES_PATH: /app/config/rules.yaml
-      PANDA_MESSAGES_PATH: /app/config/messages.yaml
-    volumes:
-      - ./data:/app/data
-    restart: unless-stopped
-    stop_grace_period: 20s
+  shadow:
+    <<: *bot-service
+    profiles:
+      - shadow
+    command:
+      - shadow
+
+  live:
+    <<: *bot-service
+    profiles:
+      - live
+    command:
+      - live
 
   shadow-export:
     build:
@@ -29,8 +42,9 @@ services:
       PANDA_MESSAGES_PATH: /app/config/messages.yaml
     volumes:
       - ./data:/app/data
-    command:
+    entrypoint:
       - ./.venv/bin/panda-shadow-export
+    command:
       - --days
       - "5"
       - --output

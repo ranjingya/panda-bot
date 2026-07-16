@@ -25,11 +25,11 @@ class RuntimeSettings(BaseModel):
     log_level: str = "INFO"
 
     @classmethod
-    def from_env(cls) -> RuntimeSettings:
+    def from_env(cls, *, mode: str | None = None) -> RuntimeSettings:
         """从进程环境变量创建并校验运行配置。
 
         参数：
-            无。
+            mode: 启动命令显式传入的运行模式；为空时使用模型默认值。
 
         返回值：
             经过类型转换和字段校验的运行配置。
@@ -41,7 +41,6 @@ class RuntimeSettings(BaseModel):
             "target_chat_id": "PANDA_TARGET_CHAT_ID",
             "bot_open_id": "PANDA_BOT_OPEN_ID",
             "privacy_salt": "PANDA_PRIVACY_SALT",
-            "mode": "PANDA_MODE",
             "database_path": "PANDA_DATABASE_PATH",
             "rules_path": "PANDA_RULES_PATH",
             "messages_path": "PANDA_MESSAGES_PATH",
@@ -52,6 +51,8 @@ class RuntimeSettings(BaseModel):
             for field_name, environment_name in environment_names.items()
             if environment_name in os.environ
         }
+        if mode is not None:
+            values["mode"] = mode
         return cls.model_validate(values)
 
     @field_validator("mode")
@@ -61,7 +62,7 @@ class RuntimeSettings(BaseModel):
 
         normalized = value.lower()
         if normalized not in {"shadow", "live"}:
-            raise ValueError("PANDA_MODE 只能是 shadow 或 live")
+            raise ValueError("运行模式只能是 shadow 或 live")
         return normalized
 
     def validate_credentials(self) -> None:

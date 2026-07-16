@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import logging
 import random
+from collections.abc import Sequence
 from datetime import datetime
 
 from lark_channel import FeishuChannel, SecurityConfig
@@ -35,17 +37,17 @@ def configure_logging(level: str) -> None:
     )
 
 
-async def run() -> None:
+async def run(mode: str) -> None:
     """装配全部依赖并运行飞书长连接。
 
     参数：
-        无。
+        mode: 当前进程的运行模式，只允许 shadow 或 live。
 
     返回值：
         长连接停止后正常返回。
     """
 
-    runtime = RuntimeSettings.from_env()
+    runtime = RuntimeSettings.from_env(mode=mode)
     configure_logging(runtime.log_level)
     runtime.validate_credentials()
     rules = load_rule_config(runtime.rules_path)
@@ -90,11 +92,26 @@ async def run() -> None:
         await channel.disconnect()
 
 
+def parse_mode(arguments: Sequence[str] | None = None) -> str:
+    """解析必须显式提供的机器人运行模式。
+
+    参数：
+        arguments: 可选的命令行参数序列；为空时读取当前进程参数。
+
+    返回值：
+        经过 argparse 校验的 shadow 或 live 模式。
+    """
+
+    parser = argparse.ArgumentParser(description="启动盼达机器人")
+    parser.add_argument("mode", choices=("shadow", "live"), help="机器人运行模式")
+    return str(parser.parse_args(arguments).mode)
+
+
 def main() -> None:
-    """同步命令行入口。"""
+    """解析运行模式并启动机器人长连接。"""
 
     try:
-        asyncio.run(run())
+        asyncio.run(run(parse_mode()))
     except KeyboardInterrupt:
         logger.info("收到中断信号，进程已退出")
 
