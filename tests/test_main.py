@@ -37,6 +37,17 @@ def test_inbound_policy_accepts_plain_text_only_from_target_group() -> None:
         body_text="普通群消息",
         raw_content_type="text",
     )
+    mention_all_message = InboundMessage(
+        id="mention-all-message",
+        create_time=1_784_099_700_000,
+        conversation=Conversation("target-chat", "group"),
+        sender=Identity("sender", sender_type="user"),
+        content=TextContent(text="@所有人 普通群消息"),
+        content_text="@所有人 普通群消息",
+        body_text="@所有人 普通群消息",
+        mentioned_all=True,
+        raw_content_type="text",
+    )
     other_group_message = InboundMessage(
         id="other-message",
         create_time=1_784_099_700_000,
@@ -59,5 +70,6 @@ def test_inbound_policy_accepts_plain_text_only_from_target_group() -> None:
     )
 
     assert gate.evaluate(target_message).allowed is True
+    assert gate.evaluate(mention_all_message).allowed is True
     assert gate.evaluate(other_group_message).reason == "policy_group_not_in_allowlist"
     assert gate.evaluate(direct_message).reason == "policy_dm_disabled"

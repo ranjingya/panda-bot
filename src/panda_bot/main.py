@@ -43,7 +43,7 @@ def build_inbound_policy(target_chat_id: str) -> PolicyConfig:
         group_policy="allowlist",
         group_allowlist=[target_chat_id],
         require_mention=False,
-        respond_to_mention_all=False,
+        respond_to_mention_all=True,
     )
 
 

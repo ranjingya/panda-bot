@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 import pytest
-from lark_channel import Conversation, Identity, InboundMessage, ReactionEvent, TextContent
+from lark_channel import (
+    Conversation,
+    Identity,
+    InboundMessage,
+    ReactionEvent,
+    RejectEvent,
+    TextContent,
+)
 
 from panda_bot.adapters.feishu import FeishuEventAdapter
 from panda_bot.domain import MessageEvent
@@ -17,6 +26,7 @@ class CaptureService:
 
     messages: list[MessageEvent] = field(default_factory=list)
     reactions: list[tuple[str, bool]] = field(default_factory=list)
+    runtime: object = field(default_factory=lambda: SimpleNamespace(target_chat_id="chat"))
 
     async def process_message(self, event: MessageEvent) -> None:
         """保存标准化消息。"""
@@ -104,3 +114,46 @@ async def test_reaction_event_becomes_anonymous_delta() -> None:
     )
     await adapter.on_reaction(event)
     assert service.reactions == [("bot-message", True)]
+
+
+@pytest.mark.asyncio
+async def test_expected_stale_rejection_does_not_pollute_info_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """历史补投等预期拒绝只写 DEBUG，不应污染默认运行日志。"""
+
+    service = CaptureService()
+    adapter = FeishuEventAdapter(None, service)  # type: ignore[arg-type]
+    event = RejectEvent(
+        message_id="old-message",
+        chat_id="chat",
+        sender_id="sender",
+        reason="stale",
+    )
+
+    with caplog.at_level(logging.INFO, logger="panda_bot.adapters.feishu"):
+        await adapter.on_reject(event)
+
+    assert caplog.records == []
+
+
+@pytest.mark.asyncio
+async def test_unexpected_target_rejection_remains_a_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """目标群发生策略或锁异常时仍需保留可见警告。"""
+
+    service = CaptureService()
+    adapter = FeishuEventAdapter(None, service)  # type: ignore[arg-type]
+    event = RejectEvent(
+        message_id="message",
+        chat_id="chat",
+        sender_id="sender",
+        reason="lock_contention",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="panda_bot.adapters.feishu"):
+        await adapter.on_reject(event)
+
+    assert len(caplog.records) == 1
+    assert "lock_contention" in caplog.text

@@ -12,6 +12,8 @@ from panda_bot.service import PandaService
 
 logger = logging.getLogger(__name__)
 
+EXPECTED_REJECT_REASONS = frozenset({"stale", "duplicate", "self_sent"})
+
 
 class FeishuEventAdapter:
     """将 SDK 事件转换为项目领域事件。"""
@@ -57,14 +59,20 @@ class FeishuEventAdapter:
     async def on_reject(self, event: RejectEvent) -> None:
         """记录 SDK 在业务适配器之前拒绝目标群事件的原因。"""
 
-        if event.chat_id == self.service.runtime.target_chat_id:
-            logger.warning(
-                "目标群入站事件被飞书 Channel SDK 拒绝 message_id=%s reason=%s",
-                event.message_id,
+        if event.chat_id != self.service.runtime.target_chat_id:
+            logger.debug("非目标群入站事件已由飞书 Channel SDK 拒绝 reason=%s", event.reason)
+            return
+        if event.reason in EXPECTED_REJECT_REASONS:
+            logger.debug(
+                "目标群入站事件按预期被飞书 Channel SDK 丢弃 reason=%s",
                 event.reason,
             )
             return
-        logger.debug("非目标群入站事件已由飞书 Channel SDK 拒绝 reason=%s", event.reason)
+        logger.warning(
+            "目标群入站事件被飞书 Channel SDK 拒绝 message_id=%s reason=%s",
+            event.message_id,
+            event.reason,
+        )
 
     @staticmethod
     async def on_error(error: object) -> None:
