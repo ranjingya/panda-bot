@@ -93,12 +93,11 @@ tests/                  # 自动化测试
 
 长连接只要求运行环境能够访问公网，不需要公网 IP、域名或内网穿透。
 
-## 本地运行
+## Docker 运行
 
-项目要求 Python 3.12～3.14，推荐使用 uv 管理环境。
+复制环境变量示例并填写飞书应用凭证、目标群 ID 和隐私盐值：
 
 ```bash
-uv sync --all-groups
 cp .env.example .env
 ```
 
@@ -112,42 +111,48 @@ PANDA_PRIVACY_SALT=replace_with_a_random_local_value
 PANDA_MODE=shadow
 ```
 
-启动：
+构建并启动机器人：
 
 ```bash
-uv run --env-file .env panda-bot
+docker compose up -d --build panda-bot
+docker compose logs -f panda-bot
 ```
 
 首次运行使用 `shadow` 模式。该模式正常接收、分类、抽签和更新状态，不向群内发送任何消息；同时保存目标群有效成员文字的脱敏正文及当时的分类、决策、能量和活跃度快照。默认保留 5 天，每次采集时自动删除过期记录。
 
-运行 3～5 个工作日后导出 AI 可读的校准报告：
+运行 3～5 个工作日后执行 Compose 中已经配置好的导出服务：
 
 ```bash
-uv run --env-file .env panda-shadow-export --days 5 --output data/shadow-review.md
+docker compose run --rm shadow-export
 ```
 
-导出文件位于已被 Git 忽略的 `data/` 目录。可以让 AI 读取该报告，找出真实收尾表达的漏判与误判，并总结群聊节奏、常用梗和文案风格建议。完成校准并更新 `config/rules.yaml`、`config/messages.yaml` 后，将模式切换为：
+导出天数、数据库路径和输出路径已经写入 `compose.yaml`，无需在命令中填写。报告会直接生成到宿主机 `data/shadow-review.md`；该目录已被 Git 忽略。可以让 AI 读取该报告，找出真实收尾表达的漏判与误判，并总结群聊节奏、常用梗和文案风格建议。完成校准并更新 `config/rules.yaml`、`config/messages.yaml` 后，将模式切换为：
 
 ```dotenv
 PANDA_MODE=live
 ```
 
-正式模式首次启动时会发送一次欢迎语。
-
-## Docker 运行
+重新创建容器使模式和配置生效：
 
 ```bash
-docker compose build
-docker compose up -d
-docker compose logs -f panda-bot
+docker compose up -d --build --force-recreate panda-bot
 ```
 
-容器使用非 root 用户运行，SQLite 数据保存在 `panda-data` 持久化卷中。更新容器不会删除群状态。
+正式模式首次启动时会发送一次欢迎语。容器使用非 root 用户运行，SQLite 数据和 Shadow 报告保存在宿主机 `data/` 目录，重新创建容器不会删除群状态。
 
 停止服务：
 
 ```bash
 docker compose down
+```
+
+## 本地开发
+
+项目要求 Python 3.12～3.14，使用 uv 管理环境：
+
+```bash
+uv sync --all-groups
+uv run --env-file .env panda-bot
 ```
 
 ## 配置说明
