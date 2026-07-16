@@ -174,6 +174,10 @@ class PandaService:
         if event.text.strip().lower() != STATUS_COMMAND:
             return False
 
+        if not event.mentions_bot:
+            logger.info("状态命令缺少机器人艾特，已忽略 event_id=%s", event.event_id)
+            return True
+
         now = self.clock()
         if not self.engine.is_work_time(now):
             logger.info("状态命令位于静默时段，已忽略 event_id=%s", event.event_id)

@@ -48,11 +48,27 @@ class MutableClock:
         return self.now
 
 
-def make_event(index: int, sender: str, when: datetime, text: str) -> MessageEvent:
+def make_event(
+    index: int,
+    sender: str,
+    when: datetime,
+    text: str,
+    *,
+    mentions_bot: bool = False,
+) -> MessageEvent:
     """创建应用服务测试事件。"""
 
     identifier = f"message-{index}"
-    return MessageEvent(identifier, identifier, "chat", sender, "user", text, when)
+    return MessageEvent(
+        identifier,
+        identifier,
+        "chat",
+        sender,
+        "user",
+        text,
+        when,
+        mentions_bot=mentions_bot,
+    )
 
 
 def build_service(
@@ -171,7 +187,7 @@ async def test_status_command_reports_dynamic_state_snapshot(
     state.risk_until = clock.now + timedelta(minutes=10)
     await repository.save_state(state)
 
-    await service.process_message(make_event(901, "a", clock.now, "/status"))
+    await service.process_message(make_event(901, "a", clock.now, "/status", mentions_bot=True))
 
     text = gateway.sent[0][1]
     assert "能量：60.0 / 50.0（已超过 10.0）" in text
@@ -199,11 +215,35 @@ async def test_status_command_respects_silent_modes_and_hours(
     await repository.initialize()
     if mode == "live":
         clock.now = datetime(2026, 7, 15, 17, 30, tzinfo=ZONE)
-    command = make_event(900, "a", clock.now, "/status")
+    command = make_event(900, "a", clock.now, "/status", mentions_bot=True)
 
     await service.process_message(command)
 
     assert gateway.sent == []
+
+
+@pytest.mark.asyncio
+async def test_status_command_requires_bot_mention(
+    tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """单独发送状态文本时应静默且不得进入普通消息规则。"""
+
+    service, repository, gateway, clock = build_service(
+        tmp_path=tmp_path,
+        rules=rules,
+        catalog=catalog,
+        deterministic_random=deterministic_random,
+        mode="live",
+    )
+    await repository.initialize()
+
+    await service.process_message(make_event(902, "a", clock.now, "/status"))
+
+    assert gateway.sent == []
+    state = await repository.load_state("chat")
+    assert state is not None
+    assert state.daily_turns == 0
+    assert state.energy == 0
 
 
 @pytest.mark.asyncio
