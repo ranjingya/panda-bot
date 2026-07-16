@@ -9,7 +9,7 @@ import random
 from collections.abc import Sequence
 from datetime import datetime
 
-from lark_channel import FeishuChannel, SecurityConfig
+from lark_channel import FeishuChannel, PolicyConfig, SecurityConfig
 
 from panda_bot.adapters.feishu import FeishuEventAdapter
 from panda_bot.classifier import RuleClassifier
@@ -26,6 +26,25 @@ from panda_bot.settings import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def build_inbound_policy(target_chat_id: str) -> PolicyConfig:
+    """构建只接收目标群消息的飞书 SDK 入站策略。
+
+    参数：
+        target_chat_id: 允许进入业务适配器的目标群标识。
+
+    返回值：
+        无需艾特机器人、且只放行目标群的 SDK 入站策略。
+    """
+
+    return PolicyConfig(
+        dm_policy="disabled",
+        group_policy="allowlist",
+        group_allowlist=[target_chat_id],
+        require_mention=False,
+        respond_to_mention_all=False,
+    )
 
 
 def configure_logging(level: str) -> None:
@@ -65,6 +84,7 @@ async def run(mode: str) -> None:
         app_id=runtime.app_id,
         app_secret=runtime.app_secret,
         transport="ws",
+        policy=build_inbound_policy(runtime.target_chat_id),
         security=SecurityConfig(mode="audit"),
     )
     gateway = FeishuMessageGateway(channel)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from lark_channel import FeishuChannel, InboundMessage, ReactionEvent
+from lark_channel import FeishuChannel, InboundMessage, ReactionEvent, RejectEvent
 
 from panda_bot.domain import MessageEvent
 from panda_bot.service import PandaService
@@ -25,6 +25,7 @@ class FeishuEventAdapter:
 
         self.channel.on("message", self.on_message)
         self.channel.on("reaction", self.on_reaction)
+        self.channel.on("reject", self.on_reject)
         self.channel.on("error", self.on_error)
 
     async def on_message(self, message: InboundMessage) -> None:
@@ -52,6 +53,18 @@ class FeishuEventAdapter:
         """将表情增删事件转换为匿名计数变化。"""
 
         await self.service.process_reaction(event.message_id, event.action == "added")
+
+    async def on_reject(self, event: RejectEvent) -> None:
+        """记录 SDK 在业务适配器之前拒绝目标群事件的原因。"""
+
+        if event.chat_id == self.service.runtime.target_chat_id:
+            logger.warning(
+                "目标群入站事件被飞书 Channel SDK 拒绝 message_id=%s reason=%s",
+                event.message_id,
+                event.reason,
+            )
+            return
+        logger.debug("非目标群入站事件已由飞书 Channel SDK 拒绝 reason=%s", event.reason)
 
     @staticmethod
     async def on_error(error: object) -> None:
