@@ -1,0 +1,237 @@
+proactive:
+  - id: tech-01
+    theme: 技术
+    text: "🐼 有点东西，孩子们。自由条刚才动了一格。"
+  - id: tech-02
+    theme: 技术
+    text: "🐼 连续收尾。今天的 bug 已经开始假装不认识我们了。"
+  - id: tech-03
+    theme: 技术
+    text: "🐼 今日 token 烧得很有价值，结算进度正在加载。"
+  - id: tech-04
+    theme: 技术
+    text: "🐼 检测到稳定运行四个字，盼达先替大家致敬。"
+  - id: tech-05
+    theme: 技术
+    text: "🐼 流程能跑，代码没炸，今天突然有了一点盼头。"
+  - id: tech-06
+    theme: 技术
+    text: "🐼 当前版本疑似可用。请勿随意点击新增需求。"
+  - id: tech-07
+    theme: 技术
+    text: "🐼 工作进度发生可疑位移，建议保持这个势头。"
+  - id: tech-08
+    theme: 技术
+    text: "🐼 bug 数量正在下降，自由浓度正在上升。"
+  - id: tech-09
+    theme: 技术
+    text: "🐼 今日代码已有交代，剩余 token 可以留给明天。"
+  - id: tech-10
+    theme: 技术
+    text: "🐼 检测到一个能跑的东西。虽然可疑，但值得庆祝。"
+  - id: tech-11
+    theme: 技术
+    text: "🐼 当前任务已进入可吹牛阶段，孩子们稳住。"
+  - id: tech-12
+    theme: 技术
+    text: "🐼 这波收尾很丝滑，像是 bug 今天忘了上班。"
+  - id: freedom-01
+    theme: 自由
+    text: "🐼 自由已进入待交付状态，谁也不准返工。"
+  - id: freedom-02
+    theme: 自由
+    text: "🐼 牢门出现轻微松动，盼达正在暗中观察。"
+  - id: freedom-03
+    theme: 自由
+    text: "🐼 自由加载速度突然正常了，事情开始不对劲。"
+  - id: freedom-04
+    theme: 自由
+    text: "🐼 今日空气里的自由含量，刚刚偷偷涨了一点。"
+  - id: freedom-05
+    theme: 自由
+    text: "🐼 盼达掐指一算，今天似乎有机会全身而退。"
+  - id: freedom-06
+    theme: 自由
+    text: "🐼 牢门没开，但钥匙好像已经在路上了。"
+  - id: freedom-07
+    theme: 自由
+    text: "🐼 有人把活干完了，自由开始坐不住了。"
+  - id: freedom-08
+    theme: 自由
+    text: "🐼 自由指数突破了一个不便透露的临界值。"
+  - id: freedom-09
+    theme: 自由
+    text: "🐼 今日份牛马体验卡，似乎正在接近有效期。"
+  - id: freedom-10
+    theme: 自由
+    text: "🐼 盼头已到账，具体金额暂时保密。"
+  - id: freedom-11
+    theme: 自由
+    text: "🐼 外面的世界没有新增需求，暂时可以期待一下。"
+  - id: freedom-12
+    theme: 自由
+    text: "🐼 自由正在排队进场，前面只剩几个收尾。"
+  - id: game-01
+    theme: 游戏
+    text: "🐼 今日主线已经进入结算阶段。"
+  - id: game-02
+    theme: 游戏
+    text: "🐼 连续完成信号已触发，通关动画正在缓冲。"
+  - id: game-03
+    theme: 游戏
+    text: "🐼 下一个新增需求将自动识别为付费 DLC。"
+  - id: game-04
+    theme: 游戏
+    text: "🐼 今日副本进度不错，Boss 看起来也想回家。"
+  - id: game-05
+    theme: 游戏
+    text: "🐼 主线任务有动静，存档点正在靠近。"
+  - id: game-06
+    theme: 游戏
+    text: "🐼 本局已进入后半场，请谨慎接取新任务。"
+  - id: game-07
+    theme: 游戏
+    text: "🐼 任务栏正在变短，这在工作日里十分罕见。"
+  - id: game-08
+    theme: 游戏
+    text: "🐼 通关条件正在逐个满足，先别手欠开新副本。"
+  - id: game-09
+    theme: 游戏
+    text: "🐼 今日成就已解锁：事情真的在变少。"
+  - id: game-10
+    theme: 游戏
+    text: "🐼 结算按钮若隐若现，大家继续保持潜行。"
+  - id: absurd-01
+    theme: 荒诞
+    text: "🐼 额滴使命正在完成列，盼达批准继续推进。"
+  - id: absurd-02
+    theme: 荒诞
+    text: "🐼 经盼达鉴定，这几句完成不是演的。"
+  - id: absurd-03
+    theme: 荒诞
+    text: "🐼 今天的草台班子，居然真的把台搭起来了。"
+  - id: absurd-04
+    theme: 荒诞
+    text: "🐼 刚才那一下很专业，差点忘了大家是来上班的。"
+  - id: absurd-05
+    theme: 荒诞
+    text: "🐼 事情开始顺利，建议立刻截图留证。"
+  - id: absurd-06
+    theme: 荒诞
+    text: "🐼 今日奇迹：任务没有繁殖，反而少了几个。"
+  - id: absurd-07
+    theme: 荒诞
+    text: "🐼 盼达刚醒就看见进展，多少有点不适应。"
+  - id: absurd-08
+    theme: 荒诞
+    text: "🐼 这波有如神功大成，但请先不要声张。"
+  - id: absurd-09
+    theme: 荒诞
+    text: "🐼 工作正在收尾，建议把门焊上防止需求进来。"
+  - id: absurd-10
+    theme: 荒诞
+    text: "🐼 有活被做完了。是谁这么大胆，我先致敬。"
+  - id: food-01
+    theme: 饭点
+    text: "🐼 事情开始收尾，可以分一点脑子研究晚饭了。"
+  - id: food-02
+    theme: 饭点
+    text: "🐼 当前进度适合偷偷看一眼今晚吃什么。"
+  - id: food-03
+    theme: 饭点
+    text: "🐼 收尾信号不错，奶茶决策可以提前进入评审。"
+  - id: food-04
+    theme: 饭点
+    text: "🐼 今日主线渐稳，晚饭支线已经悄悄刷新。"
+  - id: food-05
+    theme: 饭点
+    text: "🐼 自由和晚饭都在靠近，顺序暂时未知。"
+  - id: food-06
+    theme: 饭点
+    text: "🐼 进展可喜，建议保留一点算力选择晚饭。"
+  - id: food-07
+    theme: 饭点
+    text: "🐼 事情少了一点，食欲多了一点，很合理。"
+  - id: food-08
+    theme: 饭点
+    text: "🐼 盼达收到收尾信号，并开始认真思考奶茶。"
+  - id: lowkey-01
+    theme: 低调
+    text: "🐼 有戏。"
+  - id: lowkey-02
+    theme: 低调
+    text: "🐼 有点东西，孩子们。"
+  - id: lowkey-03
+    theme: 低调
+    text: "🐼 可以，进度很识相。"
+  - id: lowkey-04
+    theme: 低调
+    text: "🐼 这波我先致敬。"
+  - id: lowkey-05
+    theme: 低调
+    text: "🐼 嗯，今天开始有盼头了。"
+  - id: lowkey-06
+    theme: 低调
+    text: "🐼 别声张，事情正在变少。"
+  - id: lowkey-07
+    theme: 低调
+    text: "🐼 稳住，这个节奏可以。"
+  - id: lowkey-08
+    theme: 低调
+    text: "🐼 好，今天没白熬。"
+
+retorts:
+  - id: retort-01
+    theme: 回嘴
+    text: "🐼 刚越狱，路上耽搁了。"
+  - id: retort-02
+    theme: 回嘴
+    text: "🐼 我只是路过，继续装忙。"
+  - id: retort-03
+    theme: 回嘴
+    text: "🐼 别问，问就是概率学。"
+  - id: retort-04
+    theme: 回嘴
+    text: "🐼 我醒得很有原则，但原则不方便透露。"
+  - id: retort-05
+    theme: 回嘴
+    text: "🐼 收到，但我拒绝解释。"
+  - id: retort-06
+    theme: 回嘴
+    text: "🐼 你们聊，我再观察一会儿。"
+  - id: retort-07
+    theme: 回嘴
+    text: "🐼 嘻嘻，规则保密。"
+  - id: retort-08
+    theme: 回嘴
+    text: "🐼 不要试图研究熊猫。"
+  - id: retort-09
+    theme: 回嘴
+    text: "🐼 我也不想来这么晚，能量不批准。"
+  - id: retort-10
+    theme: 回嘴
+    text: "🐼 致敬可以，返工不行。"
+  - id: retort-11
+    theme: 回嘴
+    text: "🐼 这不是迟到，是随机出现。"
+  - id: retort-12
+    theme: 回嘴
+    text: "🐼 盼达已读，盼达不改。"
+  - id: retort-13
+    theme: 回嘴
+    text: "🐼 小点声，别把新增需求招来。"
+  - id: retort-14
+    theme: 回嘴
+    text: "🐼 我看见了，但我决定保持神秘。"
+  - id: retort-15
+    theme: 回嘴
+    text: "🐼 有意见请提交到明天。"
+  - id: retort-16
+    theme: 回嘴
+    text: "🐼 牢门还没开，先别激动。"
+  - id: retort-17
+    theme: 回嘴
+    text: "🐼 你说得对，但自由更对。"
+  - id: retort-18
+    theme: 回嘴
+    text: "🐼 本熊猫只负责提供盼头。"

@@ -1,0 +1,19 @@
+services:
+  panda-bot:
+    build:
+      context: .
+    image: panda-bot:local
+    container_name: panda-bot
+    env_file:
+      - .env
+    environment:
+      PANDA_DATABASE_PATH: /app/data/panda.db
+      PANDA_RULES_PATH: /app/config/rules.yaml
+      PANDA_MESSAGES_PATH: /app/config/messages.yaml
+    volumes:
+      - panda-data:/app/data
+    restart: unless-stopped
+    stop_grace_period: 20s
+
+volumes:
+  panda-data:
