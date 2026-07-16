@@ -107,6 +107,14 @@ class ContextRules(BaseModel):
     retention_minutes: int = Field(ge=1)
 
 
+class ShadowCollectionRules(BaseModel):
+    """影子模式校准语料的采集参数。"""
+
+    enabled: bool = True
+    retention_days: int = Field(default=5, ge=1, le=30)
+    max_text_chars: int = Field(default=2000, ge=100, le=10000)
+
+
 class DecayRules(BaseModel):
     """自由能量衰减参数。"""
 
@@ -251,6 +259,7 @@ class RuleConfig(BaseModel):
     schedule: ScheduleRules
     activity: ActivityRules
     context: ContextRules
+    shadow_collection: ShadowCollectionRules = Field(default_factory=ShadowCollectionRules)
     energy: EnergyRules
     trigger: TriggerRules
     classifier: ClassifierRules

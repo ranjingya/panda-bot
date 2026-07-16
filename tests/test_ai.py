@@ -20,3 +20,14 @@ def test_ai_candidate_redacts_identifiers_mentions_and_links() -> None:
     assert "123456" not in candidate.text
     assert "example.com" not in candidate.text
     assert candidate.text == "[成员] 订单 [编号] 已完成 [链接]"
+
+
+def test_ai_candidate_redacts_email_and_feishu_ids_but_keeps_tone() -> None:
+    """脱敏不得抹掉原消息的标点、换行和群聊语气。"""
+
+    candidate = build_ai_candidate(
+        "成了哈哈！\n找 test@example.com，群 oc_AbC123 😎",
+        [],
+    )
+
+    assert candidate.text == "成了哈哈！\n找 [邮箱]，群 [飞书标识] 😎"

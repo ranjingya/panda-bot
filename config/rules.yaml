@@ -18,6 +18,11 @@ context:
   max_messages: 5
   retention_minutes: 30
 
+shadow_collection:
+  enabled: true
+  retention_days: 5
+  max_text_chars: 2000
+
 energy:
   threshold_min: 45
   threshold_max: 80

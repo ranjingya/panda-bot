@@ -8,8 +8,13 @@ from typing import Protocol
 
 from panda_bot.domain import CopyChoice, SignalCategory
 
-_URL_PATTERN = re.compile(r"https?://\S+", re.IGNORECASE)
-_MENTION_PATTERN = re.compile(r"(?:<at[^>]*>.*?</at>|@\S+)", re.IGNORECASE)
+_URL_PATTERN = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
+_MENTION_PATTERN = re.compile(
+    r"(?:<at[^>]*>.*?</at>|@[^\s，。！？、；：,.!?;:]+)",
+    re.IGNORECASE,
+)
+_EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
+_FEISHU_ID_PATTERN = re.compile(r"\b(?:ou|oc|on|cli)_[A-Za-z0-9]+\b")
 _IDENTIFIER_PATTERN = re.compile(r"\b(?:[A-Za-z]{1,8}[-_])?\d{6,}\b")
 
 
@@ -64,15 +69,29 @@ def build_ai_candidate(text: str, context: list[str]) -> AICandidate:
     """
 
     return AICandidate(
-        text=_redact(text),
-        context=tuple(_redact(item) for item in context[-2:]),
+        text=redact_for_ai(text),
+        context=tuple(redact_for_ai(item) for item in context[-2:]),
     )
 
 
-def _redact(text: str) -> str:
-    """删除外部 AI 不需要接触的可识别信息。"""
+def redact_for_ai(text: str, max_chars: int | None = None) -> str:
+    """脱敏校准语料，同时保留群聊语气、标点和换行。
+
+    参数：
+        text: 需要脱敏的群聊文字。
+        max_chars: 允许保留的最大字符数；为空时不截断。
+
+    返回值：
+        删除链接、邮箱、成员提及、飞书标识和长编号后的文字。
+    """
 
     redacted = _URL_PATTERN.sub("[链接]", text)
+    redacted = _EMAIL_PATTERN.sub("[邮箱]", redacted)
     redacted = _MENTION_PATTERN.sub("[成员]", redacted)
+    redacted = _FEISHU_ID_PATTERN.sub("[飞书标识]", redacted)
     redacted = _IDENTIFIER_PATTERN.sub("[编号]", redacted)
-    return " ".join(redacted.split())
+    lines = [" ".join(line.split()) for line in redacted.splitlines()]
+    cleaned = "\n".join(line for line in lines if line).strip()
+    if max_chars is not None:
+        return cleaned[:max_chars]
+    return cleaned

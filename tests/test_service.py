@@ -278,6 +278,60 @@ async def test_shadow_mode_commits_without_sending(
 
 
 @pytest.mark.asyncio
+async def test_shadow_collects_sanitized_messages_and_decisions(
+    tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """影子模式应保存所有有效成员文字的脱敏正文与未命中决策。"""
+
+    service, repository, gateway, clock = build_service(
+        tmp_path=tmp_path,
+        rules=rules,
+        catalog=catalog,
+        deterministic_random=deterministic_random,
+        mode="shadow",
+    )
+    await repository.initialize()
+    event = make_event(
+        950,
+        "ou_real_member",
+        clock.now,
+        "这块算是齐活了！找 test@example.com 看 https://example.com/123456",
+    )
+
+    await service.process_message(event)
+    observations = await repository.list_shadow_observations("chat")
+
+    assert gateway.sent == []
+    assert len(observations) == 1
+    observation = observations[0]
+    assert observation.message_text == "这块算是齐活了！找 [邮箱] 看 [链接]"
+    assert observation.classification_reason == "ordinary_message"
+    assert observation.decision_reason == "not_enough_active_senders"
+    assert observation.anonymous_sender != event.sender_id
+    assert len(observation.anonymous_sender) == 16
+
+
+@pytest.mark.asyncio
+async def test_live_mode_never_persists_message_text(
+    tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """正式模式不得向影子语料表写入任何消息正文。"""
+
+    service, repository, _, clock = build_service(
+        tmp_path=tmp_path,
+        rules=rules,
+        catalog=catalog,
+        deterministic_random=deterministic_random,
+        mode="live",
+    )
+    await repository.initialize()
+
+    await service.process_message(make_event(951, "a", clock.now, "群里真实说法"))
+
+    assert await repository.list_shadow_observations("chat") == []
+
+
+@pytest.mark.asyncio
 async def test_live_mode_sends_once_and_deduplicates(
     tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
 ) -> None:

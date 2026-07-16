@@ -1,4 +1,4 @@
-"""SQLite 派生状态与匿名反馈仓储。"""
+"""SQLite 派生状态、影子校准语料与匿名反馈仓储。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,13 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from panda_bot.domain import GroupState, SendMode
+from panda_bot.domain import (
+    GroupState,
+    SendMode,
+    ShadowObservation,
+    SignalCategory,
+    TriggerSource,
+)
 
 
 class SQLiteRepository:
@@ -54,6 +60,42 @@ class SQLiteRepository:
         boundary = now - timedelta(days=retention_days)
         async with self._lock:
             return await asyncio.to_thread(self._cleanup_events_sync, boundary)
+
+    async def record_shadow_observation(
+        self, observation: ShadowObservation, retention_days: int
+    ) -> None:
+        """保存一条脱敏影子观察并清理过期语料。
+
+        参数：
+            observation: 已完成脱敏的成员消息与规则决策快照。
+            retention_days: 语料最多保留的自然日数。
+
+        返回值：
+            无返回值；写入与过期清理在同一事务中完成。
+        """
+
+        async with self._lock:
+            await asyncio.to_thread(
+                self._record_shadow_observation_sync,
+                observation,
+                retention_days,
+            )
+
+    async def list_shadow_observations(
+        self, chat_id: str, since: datetime | None = None
+    ) -> list[ShadowObservation]:
+        """按时间顺序读取指定群的脱敏影子观察。
+
+        参数：
+            chat_id: 需要读取的目标群标识。
+            since: 可选的最早消息时间，包含边界时刻。
+
+        返回值：
+            可以交给本地导出器和后续 AI 分析流程的观察列表。
+        """
+
+        async with self._lock:
+            return await asyncio.to_thread(self._list_shadow_observations_sync, chat_id, since)
 
     async def record_feedback(
         self,
@@ -147,10 +189,37 @@ class SQLiteRepository:
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS shadow_observations (
+                    event_id TEXT PRIMARY KEY,
+                    chat_id TEXT NOT NULL,
+                    anonymous_sender TEXT NOT NULL,
+                    message_text TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    is_new_turn INTEGER NOT NULL,
+                    classification_category TEXT NOT NULL,
+                    classification_reason TEXT NOT NULL,
+                    signal_name TEXT,
+                    decision_reason TEXT NOT NULL,
+                    trigger_source TEXT NOT NULL,
+                    should_send INTEGER NOT NULL,
+                    energy REAL NOT NULL,
+                    threshold REAL NOT NULL,
+                    probability REAL NOT NULL,
+                    roll REAL,
+                    energy_added REAL NOT NULL,
+                    afternoon_senders INTEGER NOT NULL,
+                    afternoon_turns INTEGER NOT NULL,
+                    trigger_count INTEGER NOT NULL,
+                    time_fallback_count INTEGER NOT NULL,
+                    copy_id TEXT,
+                    configuration_version TEXT NOT NULL
+                );
                 CREATE INDEX IF NOT EXISTS idx_processed_events_created_at
                     ON processed_events(created_at);
                 CREATE INDEX IF NOT EXISTS idx_feedback_sent_at
                     ON feedback(sent_at);
+                CREATE INDEX IF NOT EXISTS idx_shadow_observations_chat_created
+                    ON shadow_observations(chat_id, created_at);
                 """
             )
 
@@ -216,6 +285,97 @@ class SQLiteRepository:
                 "DELETE FROM processed_events WHERE created_at < ?", (boundary.isoformat(),)
             )
         return cursor.rowcount
+
+    def _record_shadow_observation_sync(
+        self, observation: ShadowObservation, retention_days: int
+    ) -> None:
+        """同步写入影子观察并按消息时间自动清理过期记录。"""
+
+        boundary = observation.created_at - timedelta(days=retention_days)
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO shadow_observations(
+                    event_id, chat_id, anonymous_sender, message_text, created_at,
+                    is_new_turn, classification_category, classification_reason,
+                    signal_name, decision_reason, trigger_source, should_send,
+                    energy, threshold, probability, roll, energy_added,
+                    afternoon_senders, afternoon_turns, trigger_count,
+                    time_fallback_count, copy_id, configuration_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    observation.event_id,
+                    observation.chat_id,
+                    observation.anonymous_sender,
+                    observation.message_text,
+                    observation.created_at.isoformat(),
+                    int(observation.is_new_turn),
+                    observation.classification_category.value,
+                    observation.classification_reason,
+                    observation.signal_name,
+                    observation.decision_reason,
+                    observation.trigger_source.value,
+                    int(observation.should_send),
+                    observation.energy,
+                    observation.threshold,
+                    observation.probability,
+                    observation.roll,
+                    observation.energy_added,
+                    observation.afternoon_senders,
+                    observation.afternoon_turns,
+                    observation.trigger_count,
+                    observation.time_fallback_count,
+                    observation.copy_id,
+                    observation.configuration_version,
+                ),
+            )
+            connection.execute(
+                "DELETE FROM shadow_observations WHERE created_at < ?",
+                (boundary.isoformat(),),
+            )
+
+    def _list_shadow_observations_sync(
+        self, chat_id: str, since: datetime | None
+    ) -> list[ShadowObservation]:
+        """同步读取并恢复影子观察对象。"""
+
+        query = "SELECT * FROM shadow_observations WHERE chat_id = ?"
+        parameters: list[str] = [chat_id]
+        if since is not None:
+            query += " AND created_at >= ?"
+            parameters.append(since.isoformat())
+        query += " ORDER BY created_at, event_id"
+        with self._connect() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return [
+            ShadowObservation(
+                event_id=row["event_id"],
+                chat_id=row["chat_id"],
+                anonymous_sender=row["anonymous_sender"],
+                message_text=row["message_text"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+                is_new_turn=bool(row["is_new_turn"]),
+                classification_category=SignalCategory(row["classification_category"]),
+                classification_reason=row["classification_reason"],
+                signal_name=row["signal_name"],
+                decision_reason=row["decision_reason"],
+                trigger_source=TriggerSource(row["trigger_source"]),
+                should_send=bool(row["should_send"]),
+                energy=float(row["energy"]),
+                threshold=float(row["threshold"]),
+                probability=float(row["probability"]),
+                roll=float(row["roll"]) if row["roll"] is not None else None,
+                energy_added=float(row["energy_added"]),
+                afternoon_senders=int(row["afternoon_senders"]),
+                afternoon_turns=int(row["afternoon_turns"]),
+                trigger_count=int(row["trigger_count"]),
+                time_fallback_count=int(row["time_fallback_count"]),
+                copy_id=row["copy_id"],
+                configuration_version=row["configuration_version"],
+            )
+            for row in rows
+        ]
 
     def _record_feedback_sync(
         self,

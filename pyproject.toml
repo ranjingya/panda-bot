@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 panda-bot = "panda_bot.main:main"
+panda-shadow-export = "panda_bot.shadow_export:main"
 
 [dependency-groups]
 dev = [

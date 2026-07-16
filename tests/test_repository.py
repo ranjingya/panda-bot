@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from panda_bot.domain import GroupState, SendMode
+from panda_bot.domain import (
+    GroupState,
+    SendMode,
+    ShadowObservation,
+    SignalCategory,
+    TriggerSource,
+)
 from panda_bot.repository import SQLiteRepository
 
 
@@ -71,3 +77,57 @@ async def test_anonymous_feedback_updates(tmp_path) -> None:
             "SELECT reaction_count, replied, retort_sent FROM feedback"
         ).fetchone()
     assert row == (1, 1, 1)
+
+
+def make_observation(event_id: str, created_at: datetime, text: str) -> ShadowObservation:
+    """创建仓储测试使用的完整影子观察。"""
+
+    return ShadowObservation(
+        event_id=event_id,
+        chat_id="chat",
+        anonymous_sender="daily-alias",
+        message_text=text,
+        created_at=created_at,
+        is_new_turn=True,
+        classification_category=SignalCategory.NONE,
+        classification_reason="ordinary_message",
+        signal_name=None,
+        decision_reason="time_fallback_probability_missed",
+        trigger_source=TriggerSource.TIME_FALLBACK,
+        should_send=False,
+        energy=12.0,
+        threshold=50.0,
+        probability=0.02,
+        roll=0.8,
+        energy_added=0.0,
+        afternoon_senders=2,
+        afternoon_turns=12,
+        trigger_count=0,
+        time_fallback_count=0,
+        copy_id=None,
+        configuration_version="1",
+    )
+
+
+@pytest.mark.asyncio
+async def test_shadow_observation_round_trip_and_expiry(tmp_path) -> None:
+    """影子语料应完整恢复，并在每次写入时自动清理过期记录。"""
+
+    repository = SQLiteRepository(tmp_path / "panda.db")
+    await repository.initialize()
+    now = datetime(2026, 7, 16, 15, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+    await repository.record_shadow_observation(
+        make_observation("old", now - timedelta(days=6), "旧表达"),
+        retention_days=5,
+    )
+    await repository.record_shadow_observation(
+        make_observation("current", now, "成了哈哈"),
+        retention_days=5,
+    )
+
+    observations = await repository.list_shadow_observations("chat")
+
+    assert [item.event_id for item in observations] == ["current"]
+    assert observations[0].message_text == "成了哈哈"
+    assert observations[0].decision_reason == "time_fallback_probability_missed"
+    assert observations[0].roll == 0.8

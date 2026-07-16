@@ -11,9 +11,18 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, time
 
+from panda_bot.ai import redact_for_ai
 from panda_bot.classifier import RuleClassifier
 from panda_bot.context import ContextBuffer
-from panda_bot.domain import GroupState, MessageEvent, SendMode
+from panda_bot.domain import (
+    Classification,
+    GroupState,
+    MessageEvent,
+    SendMode,
+    ShadowObservation,
+    SignalCategory,
+    TriggerDecision,
+)
 from panda_bot.engine import FreedomEngine
 from panda_bot.gateway import MessageGateway
 from panda_bot.repository import SQLiteRepository
@@ -94,6 +103,7 @@ class PandaService:
                     logger.info("群状态已切换到新日期 chat_id=%s", event.chat_id)
 
             if await self._try_status_command(event, state):
+                await self._record_status_observation(event, state)
                 await self.repository.save_state(state)
                 return
 
@@ -116,6 +126,13 @@ class PandaService:
             classification = self.classifier.classify(event.text, recent_context)
             activity_event = replace(event, sender_id=anonymous_sender)
             decision = self.engine.evaluate(activity_event, state, classification, is_new_turn)
+            observation = self._build_shadow_observation(
+                event=event,
+                state=state,
+                classification=classification,
+                decision=decision,
+                is_new_turn=is_new_turn,
+            )
             logger.info(
                 "事件决策完成 event_id=%s category=%s reason=%s energy=%.2f threshold=%.2f",
                 event.event_id,
@@ -127,6 +144,17 @@ class PandaService:
 
             if decision.should_send and decision.copy:
                 await self._handle_trigger(event, state, decision)
+
+            if observation is not None:
+                await self.repository.record_shadow_observation(
+                    observation,
+                    self.engine.rules.shadow_collection.retention_days,
+                )
+                logger.info(
+                    "影子观察已保存 event_id=%s decision=%s",
+                    event.event_id,
+                    decision.reason,
+                )
 
             await self.repository.save_state(state)
         except Exception:
@@ -140,6 +168,88 @@ class PandaService:
         salt = self.runtime.privacy_salt or self.runtime.app_secret
         value = f"{salt}:{sender_id}".encode()
         return hashlib.sha256(value).hexdigest()
+
+    def _daily_anonymous_sender(self, sender_id: str, created_at: datetime) -> str:
+        """生成只在同一天内稳定的匿名成员别名。"""
+
+        if created_at.tzinfo is None:
+            local_created_at = created_at.replace(tzinfo=self.engine.timezone)
+        else:
+            local_created_at = created_at.astimezone(self.engine.timezone)
+        salt = self.runtime.privacy_salt or self.runtime.app_secret
+        value = f"{salt}:{local_created_at.date().isoformat()}:{sender_id}".encode()
+        return hashlib.sha256(value).hexdigest()[:16]
+
+    def _build_shadow_observation(
+        self,
+        *,
+        event: MessageEvent,
+        state: GroupState,
+        classification: Classification,
+        decision: TriggerDecision,
+        is_new_turn: bool,
+    ) -> ShadowObservation | None:
+        """构造只供影子校准使用的脱敏消息与决策快照。
+
+        参数：
+            event: 当前标准化成员文字事件。
+            state: 完成当前规则评估后的群状态。
+            classification: 当前消息的语义分类结果。
+            decision: 当前消息的规则决策结果。
+            is_new_turn: 当前消息是否形成新的有效对话轮次。
+
+        返回值：
+            影子采集开启时返回脱敏观察，正式模式或关闭采集时返回空值。
+        """
+
+        collection = self.engine.rules.shadow_collection
+        if self.runtime.mode != "shadow" or not collection.enabled:
+            return None
+        return ShadowObservation(
+            event_id=event.event_id,
+            chat_id=event.chat_id,
+            anonymous_sender=self._daily_anonymous_sender(event.sender_id, event.created_at),
+            message_text=redact_for_ai(event.text, collection.max_text_chars),
+            created_at=event.created_at,
+            is_new_turn=is_new_turn,
+            classification_category=classification.category,
+            classification_reason=classification.reason,
+            signal_name=classification.signal_name,
+            decision_reason=decision.reason,
+            trigger_source=decision.source,
+            should_send=decision.should_send,
+            energy=state.energy,
+            threshold=state.threshold,
+            probability=decision.probability,
+            roll=decision.roll,
+            energy_added=decision.energy_added,
+            afternoon_senders=len(state.afternoon_senders),
+            afternoon_turns=state.afternoon_turns,
+            trigger_count=state.trigger_count,
+            time_fallback_count=state.time_fallback_count,
+            copy_id=decision.copy.copy_id if decision.copy else None,
+            configuration_version=state.configuration_version,
+        )
+
+    async def _record_status_observation(self, event: MessageEvent, state: GroupState) -> None:
+        """在影子模式中保留状态命令，确保有效成员文字采集完整。"""
+
+        classification = Classification(SignalCategory.NONE, "status_command")
+        decision = TriggerDecision(False, "status_command", classification)
+        observation = self._build_shadow_observation(
+            event=event,
+            state=state,
+            classification=classification,
+            decision=decision,
+            is_new_turn=False,
+        )
+        if observation is None:
+            return
+        await self.repository.record_shadow_observation(
+            observation,
+            self.engine.rules.shadow_collection.retention_days,
+        )
+        logger.info("影子状态命令观察已保存 event_id=%s", event.event_id)
 
     async def process_reaction(self, bot_message_id: str, added: bool) -> None:
         """匿名记录机器人消息获得或失去的表情回应。"""

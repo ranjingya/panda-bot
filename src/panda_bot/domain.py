@@ -90,6 +90,35 @@ class TriggerDecision:
     source: TriggerSource = TriggerSource.SIGNAL
 
 
+@dataclass(frozen=True, slots=True)
+class ShadowObservation:
+    """供影子模式校准使用的脱敏消息与决策快照。"""
+
+    event_id: str
+    chat_id: str
+    anonymous_sender: str
+    message_text: str
+    created_at: datetime
+    is_new_turn: bool
+    classification_category: SignalCategory
+    classification_reason: str
+    signal_name: str | None
+    decision_reason: str
+    trigger_source: TriggerSource
+    should_send: bool
+    energy: float
+    threshold: float
+    probability: float
+    roll: float | None
+    energy_added: float
+    afternoon_senders: int
+    afternoon_turns: int
+    trigger_count: int
+    time_fallback_count: int
+    copy_id: str | None
+    configuration_version: str
+
+
 @dataclass(slots=True)
 class GroupState:
     """单个群聊需要持久化的派生状态。"""

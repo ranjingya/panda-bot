@@ -17,6 +17,9 @@ def test_default_configs_are_valid() -> None:
 
     assert rules.trigger.daily_limit == 4
     assert rules.schedule.earliest_send == "14:30"
+    assert rules.shadow_collection.enabled is True
+    assert rules.shadow_collection.retention_days == 5
+    assert rules.shadow_collection.max_text_chars == 2000
     assert len(catalog.proactive) == 60
     assert len(catalog.retorts) == 18
 
