@@ -220,6 +220,20 @@ class FreedomEngine:
             and not state.interaction_replied
         )
 
+    def current_signal_probability(self, state: GroupState) -> float | None:
+        """返回当前能量对应的收尾抽签概率。
+
+        参数：
+            state: 当前群派生状态。
+
+        返回值：
+            能量达到门槛时返回当前概率档位，否则返回空值。
+        """
+
+        if state.energy < state.threshold:
+            return None
+        return self._probability(state.energy - state.threshold)
+
     def is_work_time(self, now: datetime) -> bool:
         """判断时间是否位于上午或下午工作时段。"""
 

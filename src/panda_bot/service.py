@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import math
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import replace
@@ -12,7 +13,7 @@ from datetime import datetime, time
 
 from panda_bot.classifier import RuleClassifier
 from panda_bot.context import ContextBuffer
-from panda_bot.domain import MessageEvent, SendMode
+from panda_bot.domain import GroupState, MessageEvent, SendMode
 from panda_bot.engine import FreedomEngine
 from panda_bot.gateway import MessageGateway
 from panda_bot.repository import SQLiteRepository
@@ -159,7 +160,7 @@ class PandaService:
         await self.repository.set_metadata(key, message_id)
         logger.info("首次欢迎消息发送成功")
 
-    async def _try_status_command(self, event: MessageEvent, state) -> bool:
+    async def _try_status_command(self, event: MessageEvent, state: GroupState) -> bool:
         """识别并处理不影响核心规则的状态查询命令。
 
         参数：
@@ -186,15 +187,15 @@ class PandaService:
         logger.info("状态命令回复成功 event_id=%s", event.event_id)
         return True
 
-    def _build_status_text(self, state, now: datetime) -> str:
-        """构建不公开隐藏规则和个人数据的状态文本。
+    def _build_status_text(self, state: GroupState, now: datetime) -> str:
+        """构建不公开内置规则和个人数据的状态快照。
 
         参数：
             state: 当前群派生状态。
             now: 命令处理时的当前时间。
 
         返回值：
-            包含运行阶段、当日出现次数和规则版本的简短文本。
+            包含能量、当前门槛、概率、冷却和匿名活跃度的简短文本。
         """
 
         local_now = now.astimezone(self.engine.timezone)
@@ -206,12 +207,45 @@ class PandaService:
             phase = "下午积累中"
         else:
             phase = "随机冒泡时段"
+
+        if state.energy < state.threshold:
+            energy_status = f"还差 {state.threshold - state.energy:.1f}"
+        elif state.energy > state.threshold:
+            energy_status = f"已超过 {state.energy - state.threshold:.1f}"
+        else:
+            energy_status = "已达到门槛"
+        probability = self.engine.current_signal_probability(state)
+        probability_text = f"{probability:.0%}" if probability is not None else "未达到门槛"
+        cooldown_text = self._remaining_status(state.cooldown_until, local_now)
+        risk_text = self._remaining_status(state.risk_until, local_now)
         return (
             "🐼 盼达在线\n"
             f"状态：{phase}\n"
-            f"今天冒泡：{state.trigger_count} 次\n"
+            f"能量：{state.energy:.1f} / {state.threshold:.1f}（{energy_status}）\n"
+            f"当前概率档位：{probability_text}\n"
+            f"冷却：{cooldown_text}\n"
+            f"保护静默：{risk_text}\n"
+            f"下午活跃：{len(state.afternoon_senders)} 人 / {state.afternoon_turns} 轮\n"
+            f"今天冒泡：{state.trigger_count} 次（时间兜底 {state.time_fallback_count} 次）\n"
             f"规则版本：{self.engine.rules.version}"
         )
+
+    @staticmethod
+    def _remaining_status(until: datetime | None, now: datetime) -> str:
+        """将未来截止时间转换为不暴露规则时长的状态文本。
+
+        参数：
+            until: 冷却或保护静默的截止时间。
+            now: 当前本地时间。
+
+        返回值：
+            未生效时返回“无”，生效时返回向上取整的剩余分钟数。
+        """
+
+        if until is None or until <= now:
+            return "无"
+        remaining_minutes = math.ceil((until - now).total_seconds() / 60)
+        return f"还剩 {remaining_minutes} 分钟"
 
     async def _try_retort(self, event: MessageEvent, state) -> bool:
         """在受控互动窗口内尝试发送一次回嘴。"""

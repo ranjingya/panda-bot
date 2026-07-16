@@ -130,12 +130,56 @@ async def test_live_status_command_replies_without_affecting_rules(
     assert len(gateway.sent) == 1
     assert gateway.sent[0][2] == "status-1"
     assert "盼达在线" in gateway.sent[0][1]
+    assert "能量：" in gateway.sent[0][1]
+    assert "当前概率档位：未达到门槛" in gateway.sent[0][1]
+    assert "冷却：无" in gateway.sent[0][1]
+    assert "保护静默：无" in gateway.sent[0][1]
+    assert "下午活跃：0 人 / 0 轮" in gateway.sent[0][1]
     assert "今天冒泡：0 次" in gateway.sent[0][1]
     assert "规则版本：2" in gateway.sent[0][1]
+    assert "每日上限" not in gateway.sent[0][1]
+    assert "关键词" not in gateway.sent[0][1]
     state = await repository.load_state("chat")
     assert state is not None
     assert state.energy == 0
     assert state.daily_turns == 0
+
+
+@pytest.mark.asyncio
+async def test_status_command_reports_dynamic_state_snapshot(
+    tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """状态命令应展示实时派生状态而不展示静态规则表。"""
+
+    service, repository, gateway, clock = build_service(
+        tmp_path=tmp_path,
+        rules=rules,
+        catalog=catalog,
+        deterministic_random=deterministic_random,
+        mode="live",
+    )
+    await repository.initialize()
+    clock.now = datetime(2026, 7, 15, 15, 0, tzinfo=ZONE)
+    state = service.engine.create_state("chat", clock.now)
+    state.energy = 60
+    state.threshold = 50
+    state.trigger_count = 2
+    state.time_fallback_count = 1
+    state.afternoon_senders = {"anonymous-a", "anonymous-b"}
+    state.afternoon_turns = 16
+    state.cooldown_until = clock.now + timedelta(minutes=20)
+    state.risk_until = clock.now + timedelta(minutes=10)
+    await repository.save_state(state)
+
+    await service.process_message(make_event(901, "a", clock.now, "/status"))
+
+    text = gateway.sent[0][1]
+    assert "能量：60.0 / 50.0（已超过 10.0）" in text
+    assert "当前概率档位：35%" in text
+    assert "冷却：还剩 20 分钟" in text
+    assert "保护静默：还剩 10 分钟" in text
+    assert "下午活跃：2 人 / 16 轮" in text
+    assert "今天冒泡：2 次（时间兜底 1 次）" in text
 
 
 @pytest.mark.asyncio

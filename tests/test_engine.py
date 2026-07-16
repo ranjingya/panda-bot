@@ -163,6 +163,21 @@ def test_completion_signal_has_priority_over_time_fallback(
     assert decision.energy_added == 20
 
 
+def test_current_signal_probability_uses_dynamic_energy_band(
+    rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """状态查询概率只反映当前能量所在档位。"""
+
+    engine = make_engine(rules, catalog, deterministic_random)
+    state = engine.create_state("chat", at(16, 0))
+    state.threshold = 50
+    state.energy = 49
+    assert engine.current_signal_probability(state) is None
+
+    state.energy = 60
+    assert engine.current_signal_probability(state) == 0.35
+
+
 def test_time_fallback_daily_limit_preserves_message_energy(
     rules: RuleConfig, catalog: MessageCatalog, deterministic_random
 ) -> None:
