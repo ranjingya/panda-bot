@@ -1,4 +1,4 @@
-version: "1"
+version: "2"
 
 schedule:
   timezone: Asia/Shanghai
@@ -46,6 +46,18 @@ trigger:
       probability: 0.5
     - overage: 35
       probability: 0.75
+  time_fallback:
+    enabled: true
+    daily_limit: 1
+    probability_bands:
+      - from_time: "14:30"
+        probability: 0.01
+      - from_time: "15:30"
+        probability: 0.02
+      - from_time: "16:30"
+        probability: 0.04
+      - from_time: "17:00"
+        probability: 0.08
 
 classifier:
   signals:

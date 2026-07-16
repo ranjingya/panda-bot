@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import time
 from pathlib import Path
 
 import yaml
@@ -154,6 +155,38 @@ class ProbabilityBand(BaseModel):
     probability: float = Field(gt=0, lt=1)
 
 
+class TimeProbabilityBand(BaseModel):
+    """从指定时间开始生效的兜底触发概率。"""
+
+    from_time: str
+    probability: float = Field(gt=0, lt=1)
+
+    @field_validator("from_time")
+    @classmethod
+    def validate_from_time(cls, value: str) -> str:
+        """校验兜底概率区间的起始时间。"""
+
+        time.fromisoformat(value)
+        return value
+
+
+class TimeFallbackRules(BaseModel):
+    """普通消息到达时使用的低优先级时间兜底规则。"""
+
+    enabled: bool = True
+    daily_limit: int = Field(ge=1, le=4)
+    probability_bands: list[TimeProbabilityBand]
+
+    @model_validator(mode="after")
+    def validate_time_fallback(self) -> TimeFallbackRules:
+        """校验并排序时间兜底概率区间。"""
+
+        if self.enabled and not self.probability_bands:
+            raise ValueError("启用时间兜底时至少需要一个概率区间")
+        self.probability_bands.sort(key=lambda item: time.fromisoformat(item.from_time))
+        return self
+
+
 class TriggerRules(BaseModel):
     """发送频率与概率参数。"""
 
@@ -163,6 +196,7 @@ class TriggerRules(BaseModel):
     risk_silence_minutes: int = Field(ge=1)
     reply_ratio: float = Field(ge=0, le=1)
     probability_bands: list[ProbabilityBand]
+    time_fallback: TimeFallbackRules
 
     @model_validator(mode="after")
     def validate_trigger(self) -> TriggerRules:

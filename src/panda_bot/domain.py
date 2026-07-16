@@ -23,6 +23,13 @@ class SendMode(StrEnum):
     REPLY = "reply"
 
 
+class TriggerSource(StrEnum):
+    """主动发言的规则来源。"""
+
+    SIGNAL = "signal"
+    TIME_FALLBACK = "time_fallback"
+
+
 @dataclass(frozen=True, slots=True)
 class MessageEvent:
     """标准化后的群聊文字事件。"""
@@ -80,6 +87,7 @@ class TriggerDecision:
     cooldown_minutes: int = 0
     retained_ratio: float = 0.0
     threshold_increment: float = 0.0
+    source: TriggerSource = TriggerSource.SIGNAL
 
 
 @dataclass(slots=True)
@@ -91,6 +99,7 @@ class GroupState:
     energy: float
     threshold: float
     trigger_count: int = 0
+    time_fallback_count: int = 0
     last_event_at: datetime | None = None
     last_trigger_at: datetime | None = None
     cooldown_until: datetime | None = None

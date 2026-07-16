@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, time
 
 from panda_bot.classifier import RuleClassifier
 from panda_bot.context import ContextBuffer
@@ -25,6 +25,7 @@ WELCOME_TEXT = (
     "平时不催活，也不准点报时。等我感觉今天差不多有戏了，可能会出来说两句。\n"
     "至于什么时候出现——我也不知道，嘻嘻。"
 )
+STATUS_COMMAND = "/status"
 
 
 class PandaService:
@@ -91,6 +92,10 @@ class PandaService:
                     self.context.clear_chat(event.chat_id)
                     logger.info("群状态已切换到新日期 chat_id=%s", event.chat_id)
 
+            if await self._try_status_command(event, state):
+                await self.repository.save_state(state)
+                return
+
             if await self._try_retort(event, state):
                 await self.repository.save_state(state)
                 return
@@ -154,6 +159,60 @@ class PandaService:
         await self.repository.set_metadata(key, message_id)
         logger.info("首次欢迎消息发送成功")
 
+    async def _try_status_command(self, event: MessageEvent, state) -> bool:
+        """识别并处理不影响核心规则的状态查询命令。
+
+        参数：
+            event: 当前标准化文字事件。
+            state: 当前群派生状态。
+
+        返回值：
+            当前消息属于状态命令时返回真，无论是否因静默规则实际回复。
+        """
+
+        if event.text.strip().lower() != STATUS_COMMAND:
+            return False
+
+        now = self.clock()
+        if not self.engine.is_work_time(now):
+            logger.info("状态命令位于静默时段，已忽略 event_id=%s", event.event_id)
+            return True
+        if self.runtime.mode == "shadow":
+            logger.info("影子模式收到状态命令但不发送 event_id=%s", event.event_id)
+            return True
+
+        status_text = self._build_status_text(state, now)
+        await self.gateway.send_text(event.chat_id, status_text, event.message_id)
+        logger.info("状态命令回复成功 event_id=%s", event.event_id)
+        return True
+
+    def _build_status_text(self, state, now: datetime) -> str:
+        """构建不公开隐藏规则和个人数据的状态文本。
+
+        参数：
+            state: 当前群派生状态。
+            now: 命令处理时的当前时间。
+
+        返回值：
+            包含运行阶段、当日出现次数和规则版本的简短文本。
+        """
+
+        local_now = now.astimezone(self.engine.timezone)
+        schedule = self.engine.rules.schedule
+        current = local_now.time()
+        if current < time.fromisoformat(schedule.morning_end):
+            phase = "上午观察中"
+        elif current < time.fromisoformat(schedule.earliest_send):
+            phase = "下午积累中"
+        else:
+            phase = "随机冒泡时段"
+        return (
+            "🐼 盼达在线\n"
+            f"状态：{phase}\n"
+            f"今天冒泡：{state.trigger_count} 次\n"
+            f"规则版本：{self.engine.rules.version}"
+        )
+
     async def _try_retort(self, event: MessageEvent, state) -> bool:
         """在受控互动窗口内尝试发送一次回嘴。"""
 
@@ -199,7 +258,7 @@ class PandaService:
             )
             return
 
-        if not self.engine.can_send_now(state, now):
+        if not self.engine.can_send_now(state, now, decision):
             logger.warning("发送前复核未通过，取消本次发送")
             return
 

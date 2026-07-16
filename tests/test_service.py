@@ -100,6 +100,69 @@ async def feed_active_group(service: PandaService, start: datetime) -> int:
 
 
 @pytest.mark.asyncio
+async def test_live_status_command_replies_without_affecting_rules(
+    tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """正式模式状态命令应回复公开信息且不累计活跃度或能量。"""
+
+    service, repository, gateway, clock = build_service(
+        tmp_path=tmp_path,
+        rules=rules,
+        catalog=catalog,
+        deterministic_random=deterministic_random,
+        mode="live",
+    )
+    await repository.initialize()
+    clock.now = datetime(2026, 7, 15, 15, 0, tzinfo=ZONE)
+    command = MessageEvent(
+        "status-1",
+        "status-1",
+        "chat",
+        "a",
+        "user",
+        "/status",
+        clock.now,
+        mentions_bot=True,
+    )
+
+    await service.process_message(command)
+
+    assert len(gateway.sent) == 1
+    assert gateway.sent[0][2] == "status-1"
+    assert "盼达在线" in gateway.sent[0][1]
+    assert "今天冒泡：0 次" in gateway.sent[0][1]
+    assert "规则版本：2" in gateway.sent[0][1]
+    state = await repository.load_state("chat")
+    assert state is not None
+    assert state.energy == 0
+    assert state.daily_turns == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["shadow", "live"])
+async def test_status_command_respects_silent_modes_and_hours(
+    tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random, mode: str
+) -> None:
+    """影子模式和工作时间外收到状态命令时不得发送消息。"""
+
+    service, repository, gateway, clock = build_service(
+        tmp_path=tmp_path,
+        rules=rules,
+        catalog=catalog,
+        deterministic_random=deterministic_random,
+        mode=mode,
+    )
+    await repository.initialize()
+    if mode == "live":
+        clock.now = datetime(2026, 7, 15, 17, 30, tzinfo=ZONE)
+    command = make_event(900, "a", clock.now, "/status")
+
+    await service.process_message(command)
+
+    assert gateway.sent == []
+
+
+@pytest.mark.asyncio
 async def test_shadow_mode_commits_without_sending(
     tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
 ) -> None:

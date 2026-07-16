@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from panda_bot.copywriter import Copywriter
-from panda_bot.domain import Classification, MessageEvent, SignalCategory
+from panda_bot.domain import Classification, MessageEvent, SignalCategory, TriggerSource
 from panda_bot.engine import FreedomEngine
 from panda_bot.settings import MessageCatalog, RuleConfig
 
@@ -36,7 +36,7 @@ def completion(score: int = 20) -> Classification:
 def ordinary() -> Classification:
     """创建普通消息分类。"""
 
-    return Classification(SignalCategory.NONE, "ordinary")
+    return Classification(SignalCategory.NONE, "ordinary_message")
 
 
 def make_engine(rules, catalog, deterministic_random) -> FreedomEngine:
@@ -116,6 +116,93 @@ def test_active_group_and_completion_can_trigger(
     assert decision.should_send is True
     assert decision.copy is not None
     assert decision.cooldown_minutes == 30
+
+
+def test_time_fallback_can_trigger_without_adding_energy(
+    rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """活跃群在时间区间内可由普通消息低概率兜底触发。"""
+
+    engine = make_engine(rules, catalog, deterministic_random)
+    state = engine.create_state("chat", at(13, 0))
+    state.afternoon_turns = rules.activity.min_afternoon_turns - 1
+    state.afternoon_senders = {"a", "b"}
+    state.energy = 30
+    initial_energy = state.energy
+
+    decision = engine.evaluate(event("ordinary", "a", at(14, 30)), state, ordinary(), True)
+
+    assert decision.should_send is True
+    assert decision.reason == "time_fallback_triggered"
+    assert decision.source is TriggerSource.TIME_FALLBACK
+    assert decision.send_mode.value == "standalone"
+    assert decision.probability == 0.01
+    assert state.energy == initial_energy
+
+    engine.commit_trigger(state, decision, at(14, 30), "bot-time")
+    assert state.time_fallback_count == 1
+    assert state.energy == initial_energy
+
+
+def test_completion_signal_has_priority_over_time_fallback(
+    rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """收尾消息在兜底时段内仍必须优先使用能量触发流程。"""
+
+    engine = make_engine(rules, catalog, deterministic_random)
+    state = engine.create_state("chat", at(16, 30))
+    state.threshold = 1
+    state.afternoon_turns = rules.activity.min_afternoon_turns
+    state.afternoon_senders = {"a", "b"}
+
+    decision = engine.evaluate(event("finish", "a", at(16, 30)), state, completion(20), True)
+
+    assert decision.should_send is True
+    assert decision.reason == "triggered"
+    assert decision.source is TriggerSource.SIGNAL
+    assert decision.energy_added == 20
+
+
+def test_time_fallback_daily_limit_preserves_message_energy(
+    rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """时间兜底达到单独上限后应静默且不得改变已有能量。"""
+
+    engine = make_engine(rules, catalog, deterministic_random)
+    state = engine.create_state("chat", at(16, 30))
+    state.energy = 30
+    state.afternoon_turns = rules.activity.min_afternoon_turns
+    state.afternoon_senders = {"a", "b"}
+    state.time_fallback_count = rules.trigger.time_fallback.daily_limit
+
+    decision = engine.evaluate(event("ordinary", "a", at(16, 30)), state, ordinary(), True)
+
+    assert decision.should_send is False
+    assert decision.reason == "time_fallback_daily_limit_reached"
+    assert state.energy == 30
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["negative_or_unfinished", "ignored_expression", "casual_complaint"],
+)
+def test_time_fallback_rejects_non_ordinary_messages(
+    rules: RuleConfig, catalog: MessageCatalog, deterministic_random, reason: str
+) -> None:
+    """未完成、忽略表达和日常吐槽不得参与时间兜底。"""
+
+    engine = make_engine(rules, catalog, deterministic_random)
+    state = engine.create_state("chat", at(16, 30))
+    state.afternoon_turns = rules.activity.min_afternoon_turns
+    state.afternoon_senders = {"a", "b"}
+    classification = Classification(SignalCategory.NONE, reason)
+
+    decision = engine.evaluate(
+        event(f"blocked-{reason}", "a", at(16, 30)), state, classification, True
+    )
+
+    assert decision.should_send is False
+    assert decision.reason == reason
 
 
 def test_trigger_commit_sets_cooldown_and_interaction(

@@ -29,7 +29,14 @@ class CaptureService:
         self.reactions.append((message_id, added))
 
 
-def inbound(*, sender_type: str = "user", is_bot: bool = False) -> InboundMessage:
+def inbound(
+    *,
+    sender_type: str = "user",
+    is_bot: bool = False,
+    content_text: str = "完成了",
+    body_text: str = "完成了",
+    mentioned_bot: bool = False,
+) -> InboundMessage:
     """创建飞书 SDK 入站消息。"""
 
     return InboundMessage(
@@ -37,9 +44,10 @@ def inbound(*, sender_type: str = "user", is_bot: bool = False) -> InboundMessag
         create_time=1_784_099_700_000,
         conversation=Conversation("chat", "group"),
         sender=Identity("sender", is_bot=is_bot, sender_type=sender_type),
-        content=TextContent(text="完成了"),
-        content_text="完成了",
-        body_text="完成了",
+        content=TextContent(text=content_text),
+        content_text=content_text,
+        body_text=body_text,
+        mentioned_bot=mentioned_bot,
         raw_content_type="text",
     )
 
@@ -66,6 +74,20 @@ async def test_bot_message_is_ignored() -> None:
     adapter = FeishuEventAdapter(None, service)  # type: ignore[arg-type]
     await adapter.on_message(inbound(sender_type="bot", is_bot=True))
     assert service.messages == []
+
+
+@pytest.mark.asyncio
+async def test_mention_uses_body_text_for_status_command() -> None:
+    """带机器人艾特的状态命令应去除艾特文本后进入业务服务。"""
+
+    service = CaptureService()
+    adapter = FeishuEventAdapter(None, service)  # type: ignore[arg-type]
+    await adapter.on_message(
+        inbound(content_text="@盼达 /status", body_text="/status", mentioned_bot=True)
+    )
+
+    assert service.messages[0].text == "/status"
+    assert service.messages[0].mentions_bot is True
 
 
 @pytest.mark.asyncio

@@ -14,6 +14,7 @@ from panda_bot.domain import (
     SendMode,
     SignalCategory,
     TriggerDecision,
+    TriggerSource,
 )
 from panda_bot.settings import RuleConfig
 
@@ -94,7 +95,12 @@ class FreedomEngine:
             return TriggerDecision(False, "risk_suppression_started", classification)
 
         if not classification.is_completion:
-            return TriggerDecision(False, classification.reason, classification)
+            return self._evaluate_time_fallback(
+                state=state,
+                now=now,
+                classification=classification,
+                is_new_turn=is_new_turn,
+            )
 
         energy_added = self.rng.uniform(classification.score_min, classification.score_max)
         state.energy += energy_added
@@ -166,6 +172,8 @@ class FreedomEngine:
             raise ValueError("只有成功触发决策可以提交")
         local_now = self._localize(now)
         state.trigger_count += 1
+        if decision.source is TriggerSource.TIME_FALLBACK:
+            state.time_fallback_count += 1
         state.last_trigger_at = local_now
         state.cooldown_until = local_now + timedelta(minutes=decision.cooldown_minutes)
         state.energy *= decision.retained_ratio
@@ -178,10 +186,25 @@ class FreedomEngine:
         )
         state.interaction_replied = False
 
-    def can_send_now(self, state: GroupState, now: datetime) -> bool:
-        """在真实发送前复核硬性时间、冷却、风险和上限。"""
+    def can_send_now(self, state: GroupState, now: datetime, decision: TriggerDecision) -> bool:
+        """在真实发送前复核硬性时间、冷却、风险和上限。
+
+        参数：
+            state: 当前群派生状态。
+            now: 真实发送前的当前时间。
+            decision: 即将执行的触发决策。
+
+        返回值：
+            当前仍满足对应触发来源的发送条件时返回真。
+        """
 
         local_now = self._localize(now)
+        if decision.source is TriggerSource.TIME_FALLBACK:
+            common_reason = self._common_ineligible_reason(state, local_now)
+            return bool(
+                common_reason is None
+                and state.time_fallback_count < self.rules.trigger.time_fallback.daily_limit
+            )
         return self._ineligible_reason(state, local_now) is None
 
     def can_retort(self, state: GroupState, now: datetime) -> bool:
@@ -247,6 +270,16 @@ class FreedomEngine:
     def _ineligible_reason(self, state: GroupState, now: datetime) -> str | None:
         """返回当前无法发送的首个原因。"""
 
+        common_reason = self._common_ineligible_reason(state, now)
+        if common_reason:
+            return common_reason
+        if state.energy < state.threshold:
+            return "energy_below_threshold"
+        return None
+
+    def _common_ineligible_reason(self, state: GroupState, now: datetime) -> str | None:
+        """返回所有主动触发方式共享的首个禁止原因。"""
+
         if not self.is_send_window(now):
             return "outside_send_window"
         if state.trigger_count >= self.rules.trigger.daily_limit:
@@ -259,9 +292,82 @@ class FreedomEngine:
             return "not_enough_active_senders"
         if state.afternoon_turns < self.rules.activity.min_afternoon_turns:
             return "not_enough_active_turns"
-        if state.energy < state.threshold:
-            return "energy_below_threshold"
         return None
+
+    def _evaluate_time_fallback(
+        self,
+        *,
+        state: GroupState,
+        now: datetime,
+        classification: Classification,
+        is_new_turn: bool,
+    ) -> TriggerDecision:
+        """在普通消息未命中收尾信号时评估时间兜底。
+
+        参数：
+            state: 当前群派生状态。
+            now: 当前消息的本地时间。
+            classification: 当前消息的规则分类结果。
+            is_new_turn: 当前消息是否构成新的有效对话轮次。
+
+        返回值：
+            时间兜底触发结果；不适用时返回原消息分类原因。
+        """
+
+        fallback = self.rules.trigger.time_fallback
+        if not fallback.enabled or classification.reason != "ordinary_message":
+            return TriggerDecision(False, classification.reason, classification)
+        if not is_new_turn:
+            return TriggerDecision(False, "time_fallback_requires_new_turn", classification)
+
+        common_reason = self._common_ineligible_reason(state, now)
+        if common_reason:
+            return TriggerDecision(False, common_reason, classification)
+        if state.time_fallback_count >= fallback.daily_limit:
+            return TriggerDecision(False, "time_fallback_daily_limit_reached", classification)
+
+        probability = self._time_fallback_probability(now)
+        if probability is None:
+            return TriggerDecision(False, "time_fallback_not_started", classification)
+        roll = self.rng.random()
+        if roll >= probability:
+            return TriggerDecision(
+                False,
+                "time_fallback_probability_missed",
+                classification,
+                probability=probability,
+                roll=roll,
+                source=TriggerSource.TIME_FALLBACK,
+            )
+
+        copy = self.copywriter.choose_proactive(state.recent_copy_ids)
+        return TriggerDecision(
+            True,
+            "time_fallback_triggered",
+            classification,
+            probability=probability,
+            roll=roll,
+            copy=copy,
+            send_mode=SendMode.STANDALONE,
+            cooldown_minutes=self.rng.randint(
+                self.rules.trigger.cooldown_min_minutes,
+                self.rules.trigger.cooldown_max_minutes,
+            ),
+            retained_ratio=1.0,
+            source=TriggerSource.TIME_FALLBACK,
+        )
+
+    def _time_fallback_probability(self, now: datetime) -> float | None:
+        """选择当前时间已经生效的兜底触发概率。"""
+
+        current = self._localize(now).time()
+        probability = None
+        for band in self.rules.trigger.time_fallback.probability_bands:
+            if current >= time.fromisoformat(band.from_time):
+                probability = band.probability
+            else:
+                break
+        return probability
 
     def _probability(self, overage: float) -> float:
         """根据超过门槛的能量选择阶梯概率。"""
