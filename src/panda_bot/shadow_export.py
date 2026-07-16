@@ -28,6 +28,9 @@ def render_shadow_report(observations: list[ShadowObservation], generated_at: da
         可直接交给 AI 阅读的 Markdown 文本。
     """
 
+    if generated_at.tzinfo is None or generated_at.utcoffset() is None:
+        raise ValueError("报告生成时间必须包含时区信息")
+    report_timezone = generated_at.tzinfo
     category_counts = Counter(item.classification_category.value for item in observations)
     decision_counts = Counter(item.decision_reason for item in observations)
     send_count = sum(item.should_send for item in observations)
@@ -35,6 +38,7 @@ def render_shadow_report(observations: list[ShadowObservation], generated_at: da
         "# 盼达 Shadow 校准记录",
         "",
         f"生成时间：{generated_at.isoformat(timespec='seconds')}",
+        f"报告时区：{report_timezone}",
         f"消息数：{len(observations)}；规则判定本应发送：{send_count}",
         "",
         "## AI 校准任务",
@@ -58,11 +62,14 @@ def render_shadow_report(observations: list[ShadowObservation], generated_at: da
         return "\n".join(lines) + "\n"
 
     for index, item in enumerate(observations, start=1):
+        if item.created_at.tzinfo is None or item.created_at.utcoffset() is None:
+            raise ValueError("Shadow 消息时间必须包含时区信息")
+        local_created_at = item.created_at.astimezone(report_timezone)
         probability = f"{item.probability:.0%}" if item.probability else "-"
         roll = f"{item.roll:.4f}" if item.roll is not None else "-"
         quoted_text = item.message_text.replace("\n", "\n> ") or "[空文本]"
         heading = (
-            f"### {index}. {item.created_at.isoformat(timespec='seconds')}"
+            f"### {index}. {local_created_at.isoformat(timespec='seconds')}"
             f" · 成员-{item.anonymous_sender}"
         )
         classification_line = (

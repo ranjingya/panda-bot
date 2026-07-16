@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -50,6 +50,24 @@ async def test_event_claim_is_idempotent(tmp_path) -> None:
     assert await repository.claim_event("event", now) is False
     await repository.release_event("event")
     assert await repository.claim_event("event", now) is True
+
+
+@pytest.mark.asyncio
+async def test_persisted_event_time_is_normalized_to_utc(tmp_path) -> None:
+    """数据库时间统一使用 UTC，避免不同时区偏移参与字符串比较。"""
+
+    path = tmp_path / "panda.db"
+    repository = SQLiteRepository(path)
+    await repository.initialize()
+    local_time = datetime(2026, 7, 16, 15, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+    await repository.claim_event("event", local_time)
+
+    with sqlite3.connect(path) as connection:
+        created_at = connection.execute(
+            "SELECT created_at FROM processed_events WHERE event_id = 'event'"
+        ).fetchone()[0]
+    assert created_at == "2026-07-16T07:00:00+00:00"
 
 
 @pytest.mark.asyncio
@@ -131,3 +149,21 @@ async def test_shadow_observation_round_trip_and_expiry(tmp_path) -> None:
     assert observations[0].message_text == "成了哈哈"
     assert observations[0].decision_reason == "time_fallback_probability_missed"
     assert observations[0].roll == 0.8
+
+
+@pytest.mark.asyncio
+async def test_shadow_since_boundary_compares_the_same_instant_across_timezones(tmp_path) -> None:
+    """上海时间查询边界应能命中以 UTC 保存的同一时间窗口。"""
+
+    repository = SQLiteRepository(tmp_path / "panda.db")
+    await repository.initialize()
+    utc_time = datetime(2026, 7, 16, 7, 0, tzinfo=UTC)
+    await repository.record_shadow_observation(
+        make_observation("event", utc_time, "成了哈哈"),
+        retention_days=5,
+    )
+
+    since = datetime(2026, 7, 16, 14, 59, tzinfo=ZoneInfo("Asia/Shanghai"))
+    observations = await repository.list_shadow_observations("chat", since)
+
+    assert [item.event_id for item in observations] == ["event"]

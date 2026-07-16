@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from panda_bot.domain import (
@@ -155,6 +155,14 @@ class SQLiteRepository:
         connection.execute("PRAGMA foreign_keys=ON")
         return connection
 
+    @staticmethod
+    def _utc_isoformat(value: datetime) -> str:
+        """将带时区时间统一转换为可排序的 UTC ISO 字符串。"""
+
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("持久化时间必须包含时区信息")
+        return value.astimezone(UTC).isoformat()
+
     def _initialize_sync(self) -> None:
         """同步创建数据库结构。"""
 
@@ -238,7 +246,7 @@ class SQLiteRepository:
         """同步写入群状态。"""
 
         payload = json.dumps(state.to_dict(), ensure_ascii=False, separators=(",", ":"))
-        updated_at = datetime.now().astimezone().isoformat()
+        updated_at = datetime.now(UTC).isoformat()
         with self._connect() as connection:
             connection.execute(
                 """
@@ -263,8 +271,8 @@ class SQLiteRepository:
                     """,
                     (
                         event_id,
-                        created_at.isoformat(),
-                        datetime.now().astimezone().isoformat(),
+                        self._utc_isoformat(created_at),
+                        datetime.now(UTC).isoformat(),
                     ),
                 )
         except sqlite3.IntegrityError:
@@ -282,7 +290,8 @@ class SQLiteRepository:
 
         with self._connect() as connection:
             cursor = connection.execute(
-                "DELETE FROM processed_events WHERE created_at < ?", (boundary.isoformat(),)
+                "DELETE FROM processed_events WHERE created_at < ?",
+                (self._utc_isoformat(boundary),),
             )
         return cursor.rowcount
 
@@ -309,7 +318,7 @@ class SQLiteRepository:
                     observation.chat_id,
                     observation.anonymous_sender,
                     observation.message_text,
-                    observation.created_at.isoformat(),
+                    self._utc_isoformat(observation.created_at),
                     int(observation.is_new_turn),
                     observation.classification_category.value,
                     observation.classification_reason,
@@ -332,7 +341,7 @@ class SQLiteRepository:
             )
             connection.execute(
                 "DELETE FROM shadow_observations WHERE created_at < ?",
-                (boundary.isoformat(),),
+                (self._utc_isoformat(boundary),),
             )
 
     def _list_shadow_observations_sync(
@@ -344,7 +353,7 @@ class SQLiteRepository:
         parameters: list[str] = [chat_id]
         if since is not None:
             query += " AND created_at >= ?"
-            parameters.append(since.isoformat())
+            parameters.append(self._utc_isoformat(since))
         query += " ORDER BY created_at, event_id"
         with self._connect() as connection:
             rows = connection.execute(query, parameters).fetchall()
@@ -402,7 +411,7 @@ class SQLiteRepository:
                     copy_id,
                     theme,
                     send_mode.value,
-                    sent_at.isoformat(),
+                    self._utc_isoformat(sent_at),
                     int(shadow),
                 ),
             )

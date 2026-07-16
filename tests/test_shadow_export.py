@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from panda_bot.domain import ShadowObservation, SignalCategory, TriggerSource
@@ -18,7 +18,7 @@ def test_report_contains_message_and_decision_context() -> None:
         chat_id="chat",
         anonymous_sender="abc123",
         message_text="成了哈哈！",
-        created_at=now,
+        created_at=datetime(2026, 7, 16, 7, 0, tzinfo=UTC),
         is_new_turn=True,
         classification_category=SignalCategory.NONE,
         classification_reason="ordinary_message",
@@ -45,3 +45,6 @@ def test_report_contains_message_and_decision_context() -> None:
     assert "ordinary_message" in report
     assert "time_fallback_probability_missed" in report
     assert "只分析群体表达" in report
+    assert "报告时区：Asia/Shanghai" in report
+    assert "2026-07-16T15:00:00+08:00" in report
+    assert "2026-07-16T07:00:00+00:00" not in report
