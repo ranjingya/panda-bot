@@ -242,8 +242,11 @@ class ClassifierRules(BaseModel):
     signals: list[SignalRule]
     negative_patterns: list[str]
     risk_patterns: list[str]
+    risk_negative_patterns: list[str]
     casual_complaints: list[str]
     ignored_patterns: list[str]
+    contextual_endings: list[str]
+    context_blocking_patterns: list[str]
 
 
 class PresentationRules(BaseModel):

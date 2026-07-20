@@ -123,7 +123,11 @@ class PandaService:
             ):
                 # 进程重启后仍使用持久化的匿名轮次信息完成拆句合并。
                 is_new_turn = False
-            classification = self.classifier.classify(event.text, recent_context)
+            classification = self.classifier.classify(
+                event.text,
+                recent_context,
+                is_new_turn=is_new_turn,
+            )
             activity_event = replace(event, sender_id=anonymous_sender)
             decision = self.engine.evaluate(activity_event, state, classification, is_new_turn)
             observation = self._build_shadow_observation(

@@ -265,7 +265,10 @@ async def test_shadow_mode_commits_without_sending(
     for offset in range(5):
         await service.process_message(
             make_event(
-                index + offset, "a", datetime(2026, 7, 15, 15, offset, tzinfo=ZONE), "完成了"
+                index + offset,
+                "a",
+                datetime(2026, 7, 15, 15, offset * 2, tzinfo=ZONE),
+                "完成了",
             )
         )
 
@@ -312,6 +315,31 @@ async def test_shadow_collects_sanitized_messages_and_decisions(
 
 
 @pytest.mark.asyncio
+async def test_same_burst_completion_repetition_only_adds_energy_once(
+    tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
+) -> None:
+    """同成员在一个拆句轮次内复读相似收尾时只累计一次能量。"""
+
+    service, repository, _, _ = build_service(
+        tmp_path=tmp_path,
+        rules=rules,
+        catalog=catalog,
+        deterministic_random=deterministic_random,
+        mode="shadow",
+    )
+    await repository.initialize()
+    start = datetime(2026, 7, 15, 15, 0, tzinfo=ZONE)
+    for offset, text in enumerate(("搞定了", "完成了", "收工了")):
+        await service.process_message(
+            make_event(960 + offset, "a", start + timedelta(seconds=4 * offset), text)
+        )
+
+    state = await repository.load_state("chat")
+    assert state is not None
+    assert state.energy == 15
+
+
+@pytest.mark.asyncio
 async def test_live_mode_never_persists_message_text(
     tmp_path, rules: RuleConfig, catalog: MessageCatalog, deterministic_random
 ) -> None:
@@ -352,7 +380,7 @@ async def test_live_mode_sends_once_and_deduplicates(
         final_event = make_event(
             index + offset,
             "a",
-            datetime(2026, 7, 15, 15, offset, tzinfo=ZONE),
+            datetime(2026, 7, 15, 15, offset * 2, tzinfo=ZONE),
             "完成了",
         )
         await service.process_message(final_event)
@@ -380,13 +408,13 @@ async def test_live_interaction_allows_one_retort(
     start = datetime(2026, 7, 15, 13, 0, tzinfo=ZONE)
     index = await feed_active_group(service, start)
     for offset in range(5):
-        clock.now = datetime(2026, 7, 15, 15, offset, tzinfo=ZONE)
+        clock.now = datetime(2026, 7, 15, 15, offset * 2, tzinfo=ZONE)
         await service.process_message(make_event(index + offset, "a", clock.now, "完成了"))
     state = await repository.load_state("chat")
     assert state is not None
     assert state.last_bot_message_id == "bot-1"
 
-    clock.now = datetime(2026, 7, 15, 15, 5, tzinfo=ZONE)
+    clock.now = datetime(2026, 7, 15, 15, 9, tzinfo=ZONE)
     reply = MessageEvent(
         "reply-1",
         "reply-1",
@@ -430,6 +458,10 @@ async def test_concurrent_events_are_serialized_per_chat(
     await repository.initialize()
     start = datetime(2026, 7, 15, 13, 0, tzinfo=ZONE)
     index = await feed_active_group(service, start)
+    state = await repository.load_state("chat")
+    assert state is not None
+    state.threshold = 1
+    await repository.save_state(state)
     events = [
         make_event(
             index + offset,

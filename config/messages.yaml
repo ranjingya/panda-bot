@@ -1,7 +1,7 @@
 proactive:
   - id: tech-01
     theme: 技术
-    text: "🐼 有点东西，孩子们。自由条刚才动了一格。"
+    text: "🐼 有点东西，孩子们。👍"
   - id: tech-02
     theme: 技术
     text: "🐼 连续收尾。今天的 bug 已经开始假装不认识我们了。"
@@ -10,7 +10,7 @@ proactive:
     text: "🐼 今日 token 烧得很有价值，结算进度正在加载。"
   - id: tech-04
     theme: 技术
-    text: "🐼 检测到稳定运行四个字，盼达先替大家致敬。"
+    text: "🐼 这波能跑，先致敬。👍"
   - id: tech-05
     theme: 技术
     text: "🐼 流程能跑，代码没炸，今天突然有了一点盼头。"
@@ -19,7 +19,7 @@ proactive:
     text: "🐼 当前版本疑似可用。请勿随意点击新增需求。"
   - id: tech-07
     theme: 技术
-    text: "🐼 工作进度发生可疑位移，建议保持这个势头。"
+    text: "🐼 活真少了一截，属于是有点东西。"
   - id: tech-08
     theme: 技术
     text: "🐼 bug 数量正在下降，自由浓度正在上升。"
@@ -157,13 +157,13 @@ proactive:
     text: "🐼 盼达收到收尾信号，并开始认真思考奶茶。"
   - id: lowkey-01
     theme: 低调
-    text: "🐼 有戏。"
+    text: "🐼 666，有戏。"
   - id: lowkey-02
     theme: 低调
     text: "🐼 有点东西，孩子们。"
   - id: lowkey-03
     theme: 低调
-    text: "🐼 可以，进度很识相。"
+    text: "🐼 这波属于是可以。👍"
   - id: lowkey-04
     theme: 低调
     text: "🐼 这波我先致敬。"
@@ -175,7 +175,7 @@ proactive:
     text: "🐼 别声张，事情正在变少。"
   - id: lowkey-07
     theme: 低调
-    text: "🐼 稳住，这个节奏可以。"
+    text: "🐼 稳住，牢门有动静。"
   - id: lowkey-08
     theme: 低调
     text: "🐼 好，今天没白熬。"
@@ -207,7 +207,7 @@ retorts:
     text: "🐼 不要试图研究熊猫。"
   - id: retort-09
     theme: 回嘴
-    text: "🐼 我也不想来这么晚，能量不批准。"
+    text: "🐼 我也想早点来，随机不熟。"
   - id: retort-10
     theme: 回嘴
     text: "🐼 致敬可以，返工不行。"
