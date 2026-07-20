@@ -72,6 +72,8 @@ class RuleClassifier:
 
         match = self._match_signal(current)
         if match:
+            if self._contains_any(current, self._rules.completion_blocking_patterns):
+                return Classification(SignalCategory.NONE, "qualified_completion")
             if context and not is_new_turn:
                 previous_match = self._match_signal(self.normalize(context[-1]))
                 if previous_match and previous_match.signal_name == match.signal_name:

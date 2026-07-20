@@ -117,6 +117,15 @@ def test_counterfactual_context_blocks_completion(rules: RuleConfig) -> None:
     assert result.reason == "blocked_by_short_context"
 
 
+@pytest.mark.parametrize("text", ["跑通了是跑通了", "完成了，不过还要再看看"])
+def test_qualified_completion_does_not_score(rules: RuleConfig, text: str) -> None:
+    """让步式或带明确转折的完成表达不得直接产生能量。"""
+
+    result = RuleClassifier(rules.classifier).classify(text)
+    assert result.category is SignalCategory.NONE
+    assert result.reason == "qualified_completion"
+
+
 def test_same_turn_similar_completion_only_scores_once(rules: RuleConfig) -> None:
     """同一轮内复读相似完成表达时不得重复增加能量。"""
 

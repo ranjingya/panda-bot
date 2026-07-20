@@ -247,6 +247,7 @@ class ClassifierRules(BaseModel):
     ignored_patterns: list[str]
     contextual_endings: list[str]
     context_blocking_patterns: list[str]
+    completion_blocking_patterns: list[str]
 
 
 class PresentationRules(BaseModel):

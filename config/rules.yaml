@@ -240,6 +240,15 @@ classifier:
     - 打算
     - 计划要
     - 计划再
+  completion_blocking_patterns:
+    - 跑通了是跑通了
+    - 完成是完成了
+    - 搞定是搞定了
+    - 改好是改好了
+    - 上线是上线了
+    - 发布是发布了
+    - 但是
+    - 不过
 
 presentation:
   recent_copy_window: 10
